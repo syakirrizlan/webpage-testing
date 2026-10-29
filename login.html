@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>HomeStay – Log in</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="inner">
+      <a class="logo" href="index.html">⌂ HomeStay</a>
+      <nav id="nav-links"></nav>
+    </div>
+  </header>
+
+  <main>
+    <div class="auth-wrap">
+      <div class="auth-card">
+        <h1>Welcome to HomeStay</h1>
+        <p class="sub">Log in or create a member account to book rooms.</p>
+
+        <div class="tabs">
+          <button type="button" class="active" data-tab="login">Log in</button>
+          <button type="button" data-tab="register">Sign up</button>
+        </div>
+
+        <div id="auth-error" class="alert alert-error hidden"></div>
+
+        <form id="login-form">
+          <div class="field">
+            <label for="l-email">Email</label>
+            <input type="email" id="l-email" autocomplete="email" required>
+          </div>
+          <div class="field">
+            <label for="l-pass">Password</label>
+            <input type="password" id="l-pass" autocomplete="current-password" required>
+          </div>
+          <button class="btn btn-primary btn-block" type="submit">Log in</button>
+          <div class="demo-hint">
+            Demo account: <b>demo@homestay.my</b> / <b>demo123</b>
+          </div>
+        </form>
+
+        <form id="register-form" class="hidden">
+          <div class="field">
+            <label for="r-name">Full name</label>
+            <input id="r-name" autocomplete="name" required>
+          </div>
+          <div class="field">
+            <label for="r-email">Email</label>
+            <input type="email" id="r-email" autocomplete="email" required>
+          </div>
+          <div class="field">
+            <label for="r-phone">Phone</label>
+            <input type="tel" id="r-phone" autocomplete="tel">
+          </div>
+          <div class="field">
+            <label for="r-pass">Password (min. 6 characters)</label>
+            <input type="password" id="r-pass" autocomplete="new-password" minlength="6" required>
+          </div>
+          <button class="btn btn-primary btn-block" type="submit">Create account</button>
+        </form>
+      </div>
+    </div>
+  </main>
+
+  <script src="js/store.js"></script>
+  <script src="js/login.js"></script>
+</body>
+</html>
