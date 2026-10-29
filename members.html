@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>HomeStay – My account</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="inner">
+      <a class="logo" href="index.html">⌂ HomeStay</a>
+      <nav id="nav-links"></nav>
+    </div>
+  </header>
+
+  <main>
+    <div class="members-layout">
+      <aside class="panel">
+        <div class="avatar" id="avatar"></div>
+        <h2 id="m-name"></h2>
+        <p class="meta" id="m-since"></p>
+        <div id="profile-msg" class="alert alert-ok hidden">Profile saved.</div>
+        <form id="profile-form">
+          <div class="field">
+            <label for="p-name">Full name</label>
+            <input id="p-name" required>
+          </div>
+          <div class="field">
+            <label for="p-email">Email</label>
+            <input id="p-email" disabled>
+          </div>
+          <div class="field">
+            <label for="p-phone">Phone</label>
+            <input type="tel" id="p-phone">
+          </div>
+          <button class="btn btn-ghost btn-block" type="submit">Save profile</button>
+        </form>
+      </aside>
+
+      <section>
+        <div class="stats">
+          <div class="stat"><b id="s-upcoming">0</b><span>Upcoming stays</span></div>
+          <div class="stat"><b id="s-nights">0</b><span>Nights booked</span></div>
+          <div class="stat"><b id="s-spent">RM 0</b><span>Total spent</span></div>
+        </div>
+        <div class="panel">
+          <h2>My bookings</h2>
+          <div id="bookings"></div>
+          <p style="margin-top:16px"><a class="btn btn-primary" href="index.html">Find another stay</a></p>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer>HomeStay demo · Data is stored in your browser</footer>
+
+  <script src="js/store.js"></script>
+  <script src="js/members.js"></script>
+</body>
+</html>

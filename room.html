@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>HomeStay – Room</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="inner">
+      <a class="logo" href="index.html">⌂ HomeStay</a>
+      <nav id="nav-links"></nav>
+    </div>
+  </header>
+
+  <main id="room-main">
+    <p><a href="index.html">← Back to rooms</a></p>
+    <img class="room-hero" id="room-img" alt="">
+
+    <div class="room-layout">
+      <div>
+        <h1 id="room-name"></h1>
+        <p class="meta" id="room-meta"></p>
+        <p id="room-desc"></p>
+        <h3>Amenities</h3>
+        <ul class="amenities" id="room-amenities"></ul>
+
+        <h3>Room availability</h3>
+        <p class="meta">Click a start date and an end date to choose your stay.</p>
+        <div class="calendar">
+          <div class="cal-head">
+            <button class="btn btn-ghost" id="cal-prev" aria-label="Previous month">‹</button>
+            <button class="btn btn-ghost" id="cal-next" aria-label="Next month">›</button>
+          </div>
+          <div class="cal-months" id="cal-months"></div>
+          <div class="cal-legend">
+            <span class="l-free">Available</span>
+            <span class="l-booked">Booked</span>
+            <span class="l-sel">Your selection</span>
+          </div>
+        </div>
+      </div>
+
+      <aside class="booking-box">
+        <div class="price-line"><b id="room-price"></b> / night</div>
+        <div id="book-msg" class="alert hidden"></div>
+        <form id="book-form">
+          <div class="row">
+            <div class="field">
+              <label for="b-in">Check-in</label>
+              <input type="date" id="b-in" required>
+            </div>
+            <div class="field">
+              <label for="b-out">Check-out</label>
+              <input type="date" id="b-out" required>
+            </div>
+          </div>
+          <div class="field">
+            <label for="b-guests">Guests</label>
+            <select id="b-guests"></select>
+          </div>
+          <div id="avail-status"></div>
+          <div class="summary hidden" id="summary"></div>
+          <button class="btn btn-primary btn-block" id="book-btn" type="submit" style="margin-top:14px">Reserve</button>
+        </form>
+      </aside>
+    </div>
+  </main>
+
+  <footer>HomeStay demo · Data is stored in your browser</footer>
+
+  <script src="js/store.js"></script>
+  <script src="js/room.js"></script>
+</body>
+</html>

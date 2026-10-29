@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>HomeStay – Find your homestay</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="inner">
+      <a class="logo" href="index.html">⌂ HomeStay</a>
+      <nav id="nav-links"></nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <h1>Find a homestay that feels like home</h1>
+      <p>Check room availability for your dates and book in a few clicks.</p>
+      <form class="search-bar" id="search-form">
+        <div class="field">
+          <label for="q">Where</label>
+          <select id="q">
+            <option value="">Anywhere</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="check-in">Check-in</label>
+          <input type="date" id="check-in">
+        </div>
+        <div class="field">
+          <label for="check-out">Check-out</label>
+          <input type="date" id="check-out">
+        </div>
+        <div class="field">
+          <label for="guests">Guests</label>
+          <select id="guests"></select>
+        </div>
+        <button class="btn btn-primary" type="submit">Check availability</button>
+      </form>
+    </section>
+
+    <div id="search-error" class="alert alert-error hidden"></div>
+
+    <div class="results-head">
+      <h2 id="results-title">All rooms</h2>
+      <span id="results-count"></span>
+    </div>
+    <div class="room-grid" id="room-grid"></div>
+  </main>
+
+  <footer>HomeStay demo · Data is stored in your browser</footer>
+
+  <script src="js/store.js"></script>
+  <script src="js/index.js"></script>
+</body>
+</html>
