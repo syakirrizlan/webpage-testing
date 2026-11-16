@@ -49,6 +49,12 @@ function render() {
   // Available rooms first when the guest has chosen dates.
   rooms.sort((a, b) => (b.available === true) - (a.available === true));
 
+  const member = Auth.current();
+  const next = encodeURIComponent("rooms.html" + location.search);
+  document.getElementById("price-note").classList.toggle("hidden", !!member);
+  document.getElementById("price-signin").href = `login.html?next=${next}`;
+  document.getElementById("price-register").href = `login.html?tab=register&next=${next}`;
+
   const nights = hasDates ? nightsBetween(checkIn, checkOut) : 0;
   const availableCount = rooms.filter((r) => r.available).length;
   document.getElementById("results-title").textContent = hasDates
@@ -64,8 +70,8 @@ function render() {
         const badge = r.available === null ? ""
           : r.available ? `<span class="badge badge-ok">Available</span>`
           : `<span class="badge badge-no">Booked for these dates</span>`;
-        const price = hasDates
-          ? `<b>RM ${r.price * nights}</b> total · RM ${r.price}/night`
+        const price = !member ? `<span class="price-locked">Sign in to see prices</span>`
+          : hasDates ? `<b>RM ${r.price * nights}</b> total · RM ${r.price}/night`
           : `<b>RM ${r.price}</b> / night`;
         return `
           <a class="room-card ${r.available === false ? "unavailable" : ""}" href="room.html?id=${r.id}${query}">

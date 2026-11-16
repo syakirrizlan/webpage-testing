@@ -4,6 +4,7 @@
 const BUSINESS_NAME = "Redzai Guesthouse";
 
 // Prices, capacities, photos and amenities are placeholders: edit them here.
+// Prices are only shown to signed-in members.
 // "includes" marks the whole-house option: booking it books every room listed.
 const ROOMS = [
   {
@@ -13,7 +14,7 @@ const ROOMS = [
     price: 260,
     guests: 8,
     includes: ["r1", "r2", "r3"],
-    image: "https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=900&q=70",
+    image: "images/house.jpg",
     amenities: ["3 bedrooms", "Living room", "Kitchen", "Wi-Fi", "Air-cond", "Free parking"],
     description: "Have the whole guesthouse to yourselves: the big ground-floor room and both upstairs rooms, plus the living room and kitchen. Ideal for families and groups.",
   },
@@ -23,7 +24,7 @@ const ROOMS = [
     summary: "Big room · Ground floor",
     price: 120,
     guests: 4,
-    image: "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?w=900&q=70",
+    image: "images/room1.jpg",
     amenities: ["Ground floor", "Air-cond", "Wi-Fi", "Attached bathroom"],
     description: "Our largest room, on the ground floor with no stairs to climb. Comfortable for a small family or anyone who prefers easy access.",
   },
@@ -33,7 +34,7 @@ const ROOMS = [
     summary: "Small room · Upstairs",
     price: 80,
     guests: 2,
-    image: "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=900&q=70",
+    image: "images/room2.jpg",
     amenities: ["Upstairs", "Air-cond", "Wi-Fi"],
     description: "A cosy upstairs room for one or two guests, quiet and away from the living area.",
   },
@@ -43,7 +44,7 @@ const ROOMS = [
     summary: "Small room · Upstairs",
     price: 80,
     guests: 2,
-    image: "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=900&q=70",
+    image: "images/room3.jpg",
     amenities: ["Upstairs", "Air-cond", "Wi-Fi"],
     description: "A cosy upstairs room for one or two guests, next to Room 2. Book both for a small group.",
   },

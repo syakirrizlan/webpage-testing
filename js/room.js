@@ -23,7 +23,6 @@ document.getElementById("room-name").textContent = room.name;
 document.getElementById("room-meta").textContent =
   `${room.summary} · up to ${room.guests} guests`;
 document.getElementById("room-desc").textContent = room.description;
-document.getElementById("room-price").textContent = `RM ${room.price}`;
 document.getElementById("room-amenities").innerHTML =
   room.amenities.map((a) => `<li>${escapeHTML(a)}</li>`).join("");
 
@@ -95,7 +94,17 @@ document.getElementById("cal-months").addEventListener("click", (e) => {
 
 // ---------- Booking box ----------
 
+function loginUrl() {
+  const next = `room.html?id=${room.id}&in=${inEl.value}&out=${outEl.value}&guests=${guestsEl.value}`;
+  return "login.html?next=" + encodeURIComponent(next);
+}
+
 function update() {
+  const member = Auth.current();
+  document.getElementById("price-line").innerHTML = member
+    ? `<b>RM ${room.price}</b> / night`
+    : `<a href="${escapeHTML(loginUrl())}">Sign in</a> to see prices`;
+  bookBtn.textContent = member ? "Reserve" : "Sign in to book";
   if (inEl.value) outEl.min = addDays(inEl.value, 1);
   msgEl.classList.add("hidden");
   const checkIn = inEl.value;
@@ -117,7 +126,7 @@ function update() {
       <div><span>RM ${room.price} × ${nights} night${nights > 1 ? "s" : ""}</span><span>RM ${room.price * nights}</span></div>
       <div><span>Cleaning fee</span><span>RM ${CLEANING_FEE}</span></div>
       <div class="total"><span>Total</span><span>RM ${room.price * nights + CLEANING_FEE}</span></div>`;
-    summaryEl.classList.remove("hidden");
+    summaryEl.classList.toggle("hidden", !member);
     bookBtn.disabled = !free;
   }
   renderCalendar();
@@ -134,12 +143,19 @@ function showMsg(text, ok) {
   msgEl.innerHTML = text;
 }
 
+// Signed-out visitors go straight to the login page, even before choosing dates.
+bookBtn.addEventListener("click", (e) => {
+  if (!Auth.current()) {
+    e.preventDefault();
+    location.href = loginUrl();
+  }
+});
+
 document.getElementById("book-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   const user = Auth.current();
   if (!user) {
-    const next = `room.html?id=${room.id}&in=${inEl.value}&out=${outEl.value}&guests=${guestsEl.value}`;
-    location.href = "login.html?next=" + encodeURIComponent(next);
+    location.href = loginUrl();
     return;
   }
   bookBtn.disabled = true;

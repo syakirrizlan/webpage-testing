@@ -64,32 +64,6 @@
 .ornament i { width: 10px; height: 10px; background: var(--gold); transform: rotate(45deg); }
 .tagline { max-width: 30rem; margin: 0 0 26px; font-size: 1.1rem; color: #4a4a4a; }
 
-.units {
-  list-style: none;
-  padding: 0;
-  margin: 0 0 30px;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  max-width: 34rem;
-}
-.units a {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  padding: 12px 14px;
-  border: 1px solid #eadfcd;
-  border-left: 3px solid var(--gold);
-  border-radius: 10px;
-  background: #fff;
-  text-decoration: none;
-  transition: border-color 0.15s, transform 0.15s;
-}
-.units a:hover { border-color: var(--teal); transform: translateY(-2px); }
-.units b { color: var(--teal); }
-.units span { font-size: 0.85rem; color: var(--muted); }
-.units em { font-style: normal; font-size: 0.85rem; font-weight: 600; margin-top: 4px; }
-
 .cta { display: flex; gap: 12px; flex-wrap: wrap; }
 .cta .btn { padding: 13px 26px; font-size: 1rem; }
 .btn-outline { border: 2px solid var(--teal); color: var(--teal); background: transparent; }
@@ -101,66 +75,54 @@
 .art-side {
   position: relative;
   overflow: hidden;
-  background: radial-gradient(circle at 70% 20%, #1f5a4f, var(--teal) 45%, var(--teal-dark));
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
+  background: var(--teal-dark);
 }
-.pattern { position: absolute; inset: 0; color: var(--gold); opacity: 0.13; }
-.sun {
+.art-photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.art-side::after {
+  content: "";
   position: absolute;
-  top: 12%;
-  right: 14%;
-  width: clamp(120px, 16vw, 220px);
-  aspect-ratio: 1;
-  border-radius: 50%;
-  background: radial-gradient(circle, #f6c86b, #e0565b);
-  box-shadow: 0 0 80px rgba(246, 200, 107, 0.45);
-  opacity: 0.9;
+  inset: 0;
+  background: linear-gradient(to top, rgba(12, 41, 36, 0.75), rgba(12, 41, 36, 0) 45%);
 }
-.house { position: relative; width: min(88%, 520px); margin-bottom: 7%; }
-.house .wall { fill: var(--cream); }
-.house .roof { fill: var(--brand); stroke: var(--brand-dark); stroke-width: 3; stroke-linejoin: round; }
-.house .roof-line { stroke: var(--gold); stroke-width: 3; stroke-linecap: round; }
-.house .band { fill: var(--gold); }
-.house .window { fill: #ffd98a; stroke: var(--teal-dark); stroke-width: 3; }
-.house .frame { stroke: var(--teal-dark); stroke-width: 2.5; fill: none; }
-.house .door { fill: var(--teal-dark); }
-.house .knob { fill: var(--gold); }
-.house .step { fill: #cbbfa9; }
-.house .ground { stroke: var(--gold); stroke-width: 2; opacity: 0.6; }
-.house .leaf { fill: #2f7a5f; }
-.house .leaf-2 { fill: #3c8f6f; }
-.house .label { font: 700 10px system-ui, sans-serif; letter-spacing: 0.12em; fill: var(--teal-dark); }
-
+/* Gold songket band along the edge of the photo. */
+.songket {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 28px;
+  height: 100%;
+  z-index: 1;
+  color: var(--gold);
+  background: var(--teal);
+}
 .art-card {
   position: absolute;
-  left: 8%;
-  top: 12%;
+  left: calc(28px + 6%);
+  bottom: 7%;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   padding: 14px 18px;
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  backdrop-filter: blur(6px);
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  backdrop-filter: blur(8px);
   color: #fff;
 }
-.art-card b { font-family: "Playfair Display", Georgia, serif; font-size: 1.25rem; }
-.art-card span { font-size: 0.85rem; opacity: 0.85; }
+.art-card b { font-family: "Playfair Display", Georgia, serif; font-size: 1.3rem; }
+.art-card span { font-size: 0.88rem; opacity: 0.9; }
 
 /* ---------- Small screens: art becomes a banner on top ---------- */
 @media (max-width: 860px) {
   .landing-grid { grid-template-columns: minmax(0, 1fr); }
-  .art-side { order: -1; min-height: 280px; }
-  .house { width: min(72%, 300px); margin-bottom: 0; }
-  .art-card { display: none; }
-  .sun { top: 10%; right: 8%; width: 110px; }
+  .art-side { order: -1; min-height: 260px; }
+  .songket { width: 100%; height: 14px; top: auto; bottom: 0; }
+  .art-card { left: 20px; bottom: 30px; padding: 10px 14px; }
+  .art-card b { font-size: 1.1rem; }
   .brand-side { padding: 32px 20px 48px; }
   .brand-mark { display: none; }
 }
 @media (max-width: 420px) {
-  .units { grid-template-columns: minmax(0, 1fr); }
   .cta { flex-direction: column; }
   .name-sub { letter-spacing: 0.4em; }
 }
