@@ -6,29 +6,58 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    // Admins are listed in /admins/{uid}; add or remove them in the Firebase console.
+    function isAdmin() {
+      return signedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
     function isDate(s) {
       return s is string && s.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
     }
 
-    // Member profiles: private to their owner.
-    match /users/{uid} {
+    // How long a booking holds its dates while waiting for the deposit.
+    // Must match PAYMENT.holdHours in js/store.js.
+    function holdEnds(t) {
+      return t + duration.value(24, 'h');
+    }
+
+    function onlyChanges(keys) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys);
+    }
+
+    // A member can check whether they are an admin; nobody can edit the list here.
+    match /admins/{uid} {
       allow read: if signedIn() && request.auth.uid == uid;
+    }
+
+    // Member profiles: private to their owner, readable by admins.
+    match /users/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
       allow create, update: if signedIn() && request.auth.uid == uid
-        && request.resource.data.keys().hasOnly(['name', 'phone', 'joined'])
+        && request.resource.data.keys().hasOnly(['name', 'phone', 'email', 'joined'])
         && request.resource.data.name is string
         && request.resource.data.name.size() > 0
         && request.resource.data.name.size() <= 100
         && request.resource.data.phone is string
-        && request.resource.data.phone.size() <= 30;
+        && request.resource.data.phone.size() <= 30
+        && (!('email' in request.resource.data) || request.resource.data.email == request.auth.token.email);
     }
 
-    // Bookings: a member can see, create and cancel only their own.
+    // Bookings: awaiting_deposit → awaiting_approval → confirmed, or denied /
+    // cancelled. An unpaid booking past its hold is shown as expired.
     match /bookings/{bookingId} {
-      allow read: if signedIn() && resource.data.userId == request.auth.uid;
+      function isOwner() {
+        return signedIn() && resource.data.userId == request.auth.uid;
+      }
+
+      allow read: if isOwner() || isAdmin();
+
       allow create: if signedIn()
-        && request.resource.data.keys().hasOnly(['roomId', 'userId', 'checkIn', 'checkOut', 'guests', 'status'])
+        && request.resource.data.keys().hasOnly(['roomId', 'userId', 'checkIn', 'checkOut', 'guests', 'status', 'depositAgreed', 'createdAt'])
         && request.resource.data.userId == request.auth.uid
-        && request.resource.data.status == 'confirmed'
+        && request.resource.data.status == 'awaiting_deposit'
+        && request.resource.data.depositAgreed == true
+        && request.resource.data.createdAt == request.time
         && request.resource.data.roomId in ['house', 'r1', 'r2', 'r3']
         && isDate(request.resource.data.checkIn)
         && isDate(request.resource.data.checkOut)
@@ -36,34 +65,81 @@ service cloud.firestore {
         && request.resource.data.guests is int
         && request.resource.data.guests >= 1
         && request.resource.data.guests <= 20;
-      allow update: if signedIn()
-        && resource.data.userId == request.auth.uid
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
-        && request.resource.data.status == 'cancelled';
+
+      // Guest says the deposit is paid, before the hold runs out.
+      allow update: if isOwner()
+        && resource.data.status == 'awaiting_deposit'
+        && request.time < holdEnds(resource.data.createdAt)
+        && onlyChanges(['status', 'paymentMethod', 'paymentRef', 'paidAt'])
+        && request.resource.data.status == 'awaiting_approval'
+        && request.resource.data.paymentMethod in ['qr', 'cash']
+        && request.resource.data.paymentRef is string
+        && request.resource.data.paymentRef.size() <= 60
+        && request.resource.data.paidAt == request.time;
+
+      // Guest cancels. A deposit already paid is forfeited.
+      allow update: if isOwner()
+        && resource.data.status in ['awaiting_deposit', 'awaiting_approval', 'confirmed']
+        && onlyChanges(['status', 'cancelledAt'])
+        && request.resource.data.status == 'cancelled'
+        && request.resource.data.cancelledAt == request.time;
+
+      // Admin approves or declines.
+      allow update: if isAdmin()
+        && resource.data.status in ['awaiting_deposit', 'awaiting_approval']
+        && onlyChanges(['status', 'paymentMethod', 'decidedAt', 'denyReason', 'depositRefund'])
+        && request.resource.data.status in ['confirmed', 'denied']
+        && request.resource.data.decidedAt == request.time;
     }
 
     // One document per booked night of a room, id "<roomId>_<date>". Anyone
     // can read them to see availability (they hold no personal data). Creating
-    // one that already exists counts as an update, which is not allowed, so
-    // two members can never book the same night. A whole-house booking creates
-    // a night for each of r1, r2 and r3, so it can't overlap a room booking.
+    // one that already exists counts as an update, which is only allowed when
+    // its hold has expired, so two members can never book the same night. A
+    // whole-house booking creates a night for each of r1, r2 and r3, so it
+    // can't overlap a room booking. heldAt is cleared once the deposit is paid.
     match /nights/{nightId} {
       function booking(id) {
         return getAfter(/databases/$(database)/documents/bookings/$(id)).data;
       }
 
+      function isNewHold() {
+        let n = request.resource.data;
+        let b = booking(n.bookingId);
+        return n.keys().hasOnly(['roomId', 'date', 'bookingId', 'heldAt'])
+          && n.roomId in ['r1', 'r2', 'r3']
+          && nightId == n.roomId + '_' + n.date
+          && n.heldAt == request.time
+          && b.userId == request.auth.uid
+          && b.status == 'awaiting_deposit'
+          && b.roomId in [n.roomId, 'house']
+          && n.date >= b.checkIn
+          && n.date < b.checkOut;
+      }
+
       allow read: if true;
-      allow create: if signedIn()
-        && request.resource.data.keys().hasOnly(['roomId', 'date', 'bookingId'])
-        && request.resource.data.roomId in ['r1', 'r2', 'r3']
-        && nightId == request.resource.data.roomId + '_' + request.resource.data.date
-        && booking(request.resource.data.bookingId).userId == request.auth.uid
-        && booking(request.resource.data.bookingId).roomId in [request.resource.data.roomId, 'house']
-        && booking(request.resource.data.bookingId).status == 'confirmed'
-        && request.resource.data.date >= booking(request.resource.data.bookingId).checkIn
-        && request.resource.data.date < booking(request.resource.data.bookingId).checkOut;
-      allow delete: if signedIn()
-        && get(/databases/$(database)/documents/bookings/$(resource.data.bookingId)).data.userId == request.auth.uid;
+
+      allow create: if signedIn() && isNewHold();
+
+      // Another guest may take a night whose hold ran out unpaid.
+      allow update: if signedIn()
+        && resource.data.get('heldAt', null) != null
+        && request.time > holdEnds(resource.data.heldAt)
+        && isNewHold();
+
+      // The guest who paid, or an admin approving, clears the hold.
+      allow update: if signedIn()
+        && onlyChanges(['heldAt'])
+        && request.resource.data.heldAt == null
+        && (isAdmin()
+          || (booking(resource.data.bookingId).userId == request.auth.uid
+            && booking(resource.data.bookingId).status == 'awaiting_approval'));
+
+      // A guest frees nights only by cancelling the booking in the same write.
+      allow delete: if isAdmin()
+        || (signedIn()
+          && booking(resource.data.bookingId).userId == request.auth.uid
+          && booking(resource.data.bookingId).status == 'cancelled');
     }
   }
 }

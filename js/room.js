@@ -104,7 +104,7 @@ function update() {
   document.getElementById("price-line").innerHTML = member
     ? `<b>RM ${room.price}</b> / night`
     : `<a href="${escapeHTML(loginUrl())}">Sign in</a> to see prices`;
-  bookBtn.textContent = member ? "Reserve" : "Sign in to book";
+  bookBtn.textContent = member ? "Reserve & pay deposit" : "Sign in to book";
   if (inEl.value) outEl.min = addDays(inEl.value, 1);
   msgEl.classList.add("hidden");
   const checkIn = inEl.value;
@@ -125,12 +125,17 @@ function update() {
     summaryEl.innerHTML = `
       <div><span>RM ${room.price} × ${nights} night${nights > 1 ? "s" : ""}</span><span>RM ${room.price * nights}</span></div>
       <div><span>Cleaning fee</span><span>RM ${CLEANING_FEE}</span></div>
-      <div class="total"><span>Total</span><span>RM ${room.price * nights + CLEANING_FEE}</span></div>`;
+      <div class="total"><span>Total</span><span>RM ${room.price * nights + CLEANING_FEE}</span></div>
+      <div class="deposit-row"><span>Deposit now</span><span>RM ${PAYMENT.deposit}</span></div>
+      <div><span>Balance on arrival</span><span>RM ${room.price * nights + CLEANING_FEE - PAYMENT.deposit}</span></div>`;
     summaryEl.classList.toggle("hidden", !member);
     bookBtn.disabled = !free;
   }
+  document.getElementById("deposit-note").classList.toggle("hidden", !member);
   renderCalendar();
 }
+
+document.getElementById("deposit-amount").textContent = `RM${PAYMENT.deposit}`;
 
 inEl.addEventListener("change", () => {
   if (outEl.value && outEl.value <= inEl.value) outEl.value = "";
@@ -160,16 +165,14 @@ document.getElementById("book-form").addEventListener("submit", async (e) => {
   }
   bookBtn.disabled = true;
   try {
-    await Bookings.create({
+    const id = await Bookings.create({
       roomId: room.id,
       checkIn: inEl.value,
       checkOut: outEl.value,
       guests: Number(guestsEl.value),
+      depositAgreed: document.getElementById("b-agree").checked,
     });
-    inEl.value = "";
-    outEl.value = "";
-    update();
-    showMsg(`Booking confirmed! See it in <a href="members.html">My account</a>.`, true);
+    location.href = `pay.html?id=${id}`;
   } catch (err) {
     update();
     showMsg(escapeHTML(err.message), false);
