@@ -1,72 +1,51 @@
 // Shared data layer: rooms (static), plus members and bookings stored in
 // Firebase Authentication and Cloud Firestore. Access rules: firestore.rules.
 
+const BUSINESS_NAME = "Redzai Guesthouse";
+
+// Prices, capacities, photos and amenities are placeholders: edit them here.
+// "includes" marks the whole-house option: booking it books every room listed.
 const ROOMS = [
   {
+    id: "house",
+    name: "Whole House",
+    summary: "Entire house · 3 bedrooms",
+    price: 260,
+    guests: 8,
+    includes: ["r1", "r2", "r3"],
+    image: "https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=900&q=70",
+    amenities: ["3 bedrooms", "Living room", "Kitchen", "Wi-Fi", "Air-cond", "Free parking"],
+    description: "Have the whole guesthouse to yourselves: the big ground-floor room and both upstairs rooms, plus the living room and kitchen. Ideal for families and groups.",
+  },
+  {
     id: "r1",
-    name: "Kampung Garden Chalet",
-    location: "Kuala Selangor",
-    price: 180,
+    name: "Room 1",
+    summary: "Big room · Ground floor",
+    price: 120,
     guests: 4,
-    beds: 2,
-    image: "https://images.unsplash.com/photo-1499793983690-e29da59ef1c2?w=800&q=70",
-    amenities: ["Wi-Fi", "Air-cond", "Kitchen", "Free parking"],
-    description: "A wooden chalet surrounded by fruit trees, a short drive from the fireflies of Kampung Kuantan.",
+    image: "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?w=900&q=70",
+    amenities: ["Ground floor", "Air-cond", "Wi-Fi", "Attached bathroom"],
+    description: "Our largest room, on the ground floor with no stairs to climb. Comfortable for a small family or anyone who prefers easy access.",
   },
   {
     id: "r2",
-    name: "Seaside Family House",
-    location: "Port Dickson",
-    price: 320,
-    guests: 8,
-    beds: 4,
-    image: "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?w=800&q=70",
-    amenities: ["Wi-Fi", "Air-cond", "BBQ pit", "Beach access"],
-    description: "Spacious double-storey home two minutes' walk from the beach. Ideal for family gatherings.",
+    name: "Room 2",
+    summary: "Small room · Upstairs",
+    price: 80,
+    guests: 2,
+    image: "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=900&q=70",
+    amenities: ["Upstairs", "Air-cond", "Wi-Fi"],
+    description: "A cosy upstairs room for one or two guests, quiet and away from the living area.",
   },
   {
     id: "r3",
-    name: "Highland Pine Cabin",
-    location: "Cameron Highlands",
-    price: 250,
-    guests: 3,
-    beds: 1,
-    image: "https://images.unsplash.com/photo-1449158743715-0a90ebb6d2d8?w=800&q=70",
-    amenities: ["Wi-Fi", "Fireplace", "Hot shower", "Tea farm view"],
-    description: "Cosy cabin among the pines with views over the tea plantations. Cool weather all year.",
-  },
-  {
-    id: "r4",
-    name: "Heritage Shophouse Loft",
-    location: "Melaka",
-    price: 210,
+    name: "Room 3",
+    summary: "Small room · Upstairs",
+    price: 80,
     guests: 2,
-    beds: 1,
-    image: "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800&q=70",
-    amenities: ["Wi-Fi", "Air-cond", "Walk to Jonker Street"],
-    description: "Restored 1920s shophouse loft in the heart of the UNESCO heritage zone.",
-  },
-  {
-    id: "r5",
-    name: "Paddy Field Villa",
-    location: "Langkawi",
-    price: 400,
-    guests: 6,
-    beds: 3,
-    image: "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800&q=70",
-    amenities: ["Wi-Fi", "Private pool", "Air-cond", "Kitchen"],
-    description: "Private villa with an infinity pool overlooking emerald paddy fields.",
-  },
-  {
-    id: "r6",
-    name: "City Studio Retreat",
-    location: "Kuala Lumpur",
-    price: 150,
-    guests: 2,
-    beds: 1,
-    image: "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800&q=70",
-    amenities: ["Wi-Fi", "Air-cond", "Gym", "Near LRT"],
-    description: "Modern studio with skyline views, five minutes from the LRT station.",
+    image: "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=900&q=70",
+    amenities: ["Upstairs", "Air-cond", "Wi-Fi"],
+    description: "A cosy upstairs room for one or two guests, next to Room 2. Book both for a small group.",
   },
 ];
 
@@ -212,12 +191,20 @@ const Auth = {
 
 // ---------- Bookings & availability ----------
 
+// Night documents only exist for real rooms. Booking the whole house writes a
+// night for each of its rooms, so it clashes with any room booking and vice versa.
+function lockedRooms(roomId) {
+  return getRoom(roomId).includes || [roomId];
+}
+
+const MAX_NIGHTS = 30;
+
 const Bookings = {
   forUser() {
     return myBookings;
   },
   isNightBooked(roomId, iso) {
-    return bookedNights.has(`${roomId}_${iso}`);
+    return lockedRooms(roomId).some((r) => bookedNights.has(`${r}_${iso}`));
   },
   // A room is free for [checkIn, checkOut) if none of those nights is booked.
   isAvailable(roomId, checkIn, checkOut) {
@@ -230,6 +217,7 @@ const Bookings = {
     if (!profile) throw new Error("Please log in to book.");
     if (!checkIn || !checkOut || checkOut <= checkIn) throw new Error("Check-out must be after check-in.");
     if (checkIn < toISO(new Date())) throw new Error("Check-in cannot be in the past.");
+    if (nightsBetween(checkIn, checkOut) > MAX_NIGHTS) throw new Error(`Stays are limited to ${MAX_NIGHTS} nights.`);
     if (!this.isAvailable(roomId, checkIn, checkOut)) throw new Error("Sorry, those dates are already booked.");
 
     const ref = fb.doc(fb.collection(fb.db, "bookings"));
@@ -237,7 +225,9 @@ const Bookings = {
     const batch = fb.writeBatch(fb.db);
     batch.set(ref, booking);
     for (let d = checkIn; d < checkOut; d = addDays(d, 1)) {
-      batch.set(fb.doc(fb.db, "nights", `${roomId}_${d}`), { roomId, date: d, bookingId: ref.id });
+      for (const r of lockedRooms(roomId)) {
+        batch.set(fb.doc(fb.db, "nights", `${r}_${d}`), { roomId: r, date: d, bookingId: ref.id });
+      }
     }
     try {
       await batch.commit();
@@ -248,7 +238,9 @@ const Bookings = {
       throw err;
     }
     myBookings.push({ id: ref.id, ...booking });
-    for (let d = checkIn; d < checkOut; d = addDays(d, 1)) bookedNights.add(`${roomId}_${d}`);
+    for (let d = checkIn; d < checkOut; d = addDays(d, 1)) {
+      for (const r of lockedRooms(roomId)) bookedNights.add(`${r}_${d}`);
+    }
     return booking;
   },
   async cancel(id) {
@@ -257,11 +249,13 @@ const Bookings = {
     const batch = fb.writeBatch(fb.db);
     batch.update(fb.doc(fb.db, "bookings", id), { status: "cancelled" });
     for (let d = booking.checkIn; d < booking.checkOut; d = addDays(d, 1)) {
-      batch.delete(fb.doc(fb.db, "nights", `${booking.roomId}_${d}`));
+      for (const r of lockedRooms(booking.roomId)) batch.delete(fb.doc(fb.db, "nights", `${r}_${d}`));
     }
     await batch.commit();
     booking.status = "cancelled";
-    for (let d = booking.checkIn; d < booking.checkOut; d = addDays(d, 1)) bookedNights.delete(`${booking.roomId}_${d}`);
+    for (let d = booking.checkIn; d < booking.checkOut; d = addDays(d, 1)) {
+      for (const r of lockedRooms(booking.roomId)) bookedNights.delete(`${r}_${d}`);
+    }
   },
 };
 
@@ -280,11 +274,11 @@ function renderNav() {
   if (!nav) return;
   const user = Auth.current();
   nav.innerHTML = user
-    ? `<a href="index.html">Rooms</a>
+    ? `<a href="rooms.html">Rooms</a>
        <a href="members.html">My account</a>
        <span class="nav-user">Hi, ${escapeHTML(user.name.split(" ")[0])}</span>
        <button class="btn btn-ghost" id="logout-btn">Log out</button>`
-    : `<a href="index.html">Rooms</a>
+    : `<a href="rooms.html">Rooms</a>
        <a class="btn btn-primary" href="login.html">Log in</a>`;
   const logout = document.getElementById("logout-btn");
   if (logout) {

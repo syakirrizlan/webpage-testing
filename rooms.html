@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Rooms – Redzai Guesthouse</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="inner">
+      <a class="logo" href="index.html">⌂ Redzai Guesthouse</a>
+      <nav id="nav-links"></nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <h1>Book the whole house or a single room</h1>
+      <p>Choose your dates to see what's free at Redzai Guesthouse.</p>
+      <form class="search-bar" id="search-form">
+        <div class="field">
+          <label for="check-in">Check-in</label>
+          <input type="date" id="check-in">
+        </div>
+        <div class="field">
+          <label for="check-out">Check-out</label>
+          <input type="date" id="check-out">
+        </div>
+        <div class="field">
+          <label for="guests">Guests</label>
+          <select id="guests"></select>
+        </div>
+        <button class="btn btn-primary" type="submit">Check availability</button>
+      </form>
+    </section>
+
+    <div id="search-error" class="alert alert-error hidden"></div>
+
+    <div class="results-head">
+      <h2 id="results-title">Rooms &amp; whole house</h2>
+      <span id="results-count"></span>
+    </div>
+    <div class="room-grid" id="room-grid"></div>
+  </main>
+
+  <footer>Redzai Guesthouse</footer>
+
+  <script src="js/firebase-config.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/rooms.js"></script>
+</body>
+</html>

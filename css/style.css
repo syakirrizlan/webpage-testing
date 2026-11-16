@@ -100,7 +100,7 @@ input:focus, select:focus { outline: 2px solid var(--brand); border-color: trans
 .hero p { margin: 0 0 20px; color: var(--muted); }
 .search-bar {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1fr auto;
+  grid-template-columns: 1fr 1fr 1fr auto;
   gap: 12px;
   align-items: end;
   background: #fff;
@@ -115,7 +115,7 @@ input:focus, select:focus { outline: 2px solid var(--brand); border-color: trans
 .results-head h2 { margin: 0; }
 .results-head span { color: var(--muted); font-size: 0.9rem; }
 
-.room-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 22px; }
+.room-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 22px; }
 .room-card {
   background: var(--card);
   border-radius: var(--radius);
@@ -219,7 +219,7 @@ footer { text-align: center; color: var(--muted); font-size: 0.85rem; padding: 2
 /* ---------- Responsive ---------- */
 @media (max-width: 860px) {
   .search-bar { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
-  .search-bar .field:first-child, .search-bar button { grid-column: 1 / -1; }
+  .search-bar .field:nth-child(3), .search-bar button { grid-column: 1 / -1; }
   .room-layout, .members-layout { grid-template-columns: minmax(0, 1fr); }
   .booking-box { position: static; }
   .cal-months { grid-template-columns: minmax(0, 1fr); }

@@ -1,13 +1,25 @@
-# webpage-testing
+# Redzai Guesthouse
 
-A simple homestay booking website (Airbnb-style), built with plain HTML, CSS and JavaScript.
+Booking website for Redzai Guesthouse, built with plain HTML, CSS and JavaScript.
 No build step or server code is needed.
 
 ## Features
 
+Guests can book:
+
+| Option | ID | Notes |
+| --- | --- | --- |
+| Whole House | `house` | All three rooms; can't overlap any room booking |
+| Room 1 | `r1` | Big room, ground floor |
+| Room 2 | `r2` | Small room, upstairs |
+| Room 3 | `r3` | Small room, upstairs |
+
+Prices, guest limits, photos and descriptions are in the `ROOMS` array in `js/store.js`.
+
 | Page | File | What it does |
 | --- | --- | --- |
-| Room availability | `index.html` | Browse rooms, filter by location and guests, and check which rooms are free for your dates |
+| Welcome | `index.html` | Landing page with the business name, the four options, and links to check availability or sign in |
+| Room availability | `rooms.html` | Choose dates and guests to see which options are free |
 | Room details | `room.html` | Two-month availability calendar (booked nights are crossed out), price summary, and reservation |
 | Login | `login.html` | Log in or sign up for a member account |
 | Members | `members.html` | Members-only page: profile, booking stats, and upcoming, past and cancelled bookings, with cancellation |
@@ -39,7 +51,8 @@ Then open http://localhost:8000. `localhost` is an authorized domain by default.
 - `users/{uid}`: member profile (name, phone, join date). Only that member can read or change it.
 - `bookings/{id}`: room, dates, guests and status. Only the member who made it can read or cancel it.
 - `nights/{roomId}_{date}`: one document per booked night, readable by everyone to show availability. It holds no personal data. Firestore refuses to create a night that already exists, so two members can never book the same night, even at the same moment.
-- Room listings are defined in the `ROOMS` array in `js/store.js`.
+- Booking the Whole House writes a night document for each of `r1`, `r2` and `r3`, so it can never overlap a room booking, and a room booking blocks the Whole House.
+- Room listings are defined in the `ROOMS` array in `js/store.js`. If you add or rename a room, update the room lists in `firestore.rules` and publish the rules again.
 
 The `firebaseConfig` values in `js/firebase-config.js` are not secret; access is controlled by sign-in and `firestore.rules`.
 

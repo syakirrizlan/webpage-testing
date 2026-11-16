@@ -3,7 +3,7 @@ const room = getRoom(params.get("id"));
 
 if (!room) {
   document.getElementById("room-main").innerHTML =
-    `<p class="empty">Room not found. <a href="index.html">Back to rooms</a></p>`;
+    `<p class="empty">Room not found. <a href="rooms.html">Back to rooms</a></p>`;
   throw new Error("Unknown room");
 }
 
@@ -16,12 +16,12 @@ const summaryEl = document.getElementById("summary");
 const bookBtn = document.getElementById("book-btn");
 const msgEl = document.getElementById("book-msg");
 
-document.title = `HomeStay – ${room.name}`;
+document.title = `${room.name} – ${BUSINESS_NAME}`;
 document.getElementById("room-img").src = room.image;
 document.getElementById("room-img").alt = room.name;
 document.getElementById("room-name").textContent = room.name;
 document.getElementById("room-meta").textContent =
-  `${room.location} · up to ${room.guests} guests · ${room.beds} bedroom${room.beds > 1 ? "s" : ""}`;
+  `${room.summary} · up to ${room.guests} guests`;
 document.getElementById("room-desc").textContent = room.description;
 document.getElementById("room-price").textContent = `RM ${room.price}`;
 document.getElementById("room-amenities").innerHTML =

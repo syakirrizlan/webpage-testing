@@ -29,7 +29,7 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly(['roomId', 'userId', 'checkIn', 'checkOut', 'guests', 'status'])
         && request.resource.data.userId == request.auth.uid
         && request.resource.data.status == 'confirmed'
-        && request.resource.data.roomId is string
+        && request.resource.data.roomId in ['house', 'r1', 'r2', 'r3']
         && isDate(request.resource.data.checkIn)
         && isDate(request.resource.data.checkOut)
         && request.resource.data.checkIn < request.resource.data.checkOut
@@ -42,10 +42,11 @@ service cloud.firestore {
         && request.resource.data.status == 'cancelled';
     }
 
-    // One document per booked night, id "<roomId>_<date>". Anyone can read
-    // them to see availability (they hold no personal data). Creating one that
-    // already exists counts as an update, which is not allowed, so two
-    // members can never book the same night.
+    // One document per booked night of a room, id "<roomId>_<date>". Anyone
+    // can read them to see availability (they hold no personal data). Creating
+    // one that already exists counts as an update, which is not allowed, so
+    // two members can never book the same night. A whole-house booking creates
+    // a night for each of r1, r2 and r3, so it can't overlap a room booking.
     match /nights/{nightId} {
       function booking(id) {
         return getAfter(/databases/$(database)/documents/bookings/$(id)).data;
@@ -54,9 +55,10 @@ service cloud.firestore {
       allow read: if true;
       allow create: if signedIn()
         && request.resource.data.keys().hasOnly(['roomId', 'date', 'bookingId'])
+        && request.resource.data.roomId in ['r1', 'r2', 'r3']
         && nightId == request.resource.data.roomId + '_' + request.resource.data.date
         && booking(request.resource.data.bookingId).userId == request.auth.uid
-        && booking(request.resource.data.bookingId).roomId == request.resource.data.roomId
+        && booking(request.resource.data.bookingId).roomId in [request.resource.data.roomId, 'house']
         && booking(request.resource.data.bookingId).status == 'confirmed'
         && request.resource.data.date >= booking(request.resource.data.bookingId).checkIn
         && request.resource.data.date < booking(request.resource.data.bookingId).checkOut;

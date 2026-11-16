@@ -20,7 +20,7 @@ function bookingHTML(b, canCancel) {
         ${badge}
         <h3><a href="room.html?id=${room.id}">${escapeHTML(room.name)}</a></h3>
         <div class="meta">${formatDate(b.checkIn)} → ${formatDate(b.checkOut)} · ${nights} night${nights > 1 ? "s" : ""} · ${b.guests} guest${b.guests > 1 ? "s" : ""}</div>
-        <div class="meta">${escapeHTML(room.location)} · RM ${room.price * nights + CLEANING_FEE}</div>
+        <div class="meta">${escapeHTML(room.summary)} · RM ${room.price * nights + CLEANING_FEE}</div>
       </div>
       <div class="actions">
         ${canCancel ? `<button class="btn btn-ghost" data-cancel="${b.id}">Cancel</button>` : ""}

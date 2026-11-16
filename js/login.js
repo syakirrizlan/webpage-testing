@@ -21,6 +21,10 @@ document.querySelectorAll(".tabs button").forEach((btn) => {
   });
 });
 
+if (new URLSearchParams(location.search).get("tab") === "register") {
+  document.querySelector('.tabs button[data-tab="register"]').click();
+}
+
 function showError(err) {
   errorBox.textContent = err.message;
   errorBox.classList.remove("hidden");
