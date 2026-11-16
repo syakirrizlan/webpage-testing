@@ -20,7 +20,7 @@ function bookingHTML(b, canCancel) {
         ${badge}
         <h3><a href="room.html?id=${room.id}">${escapeHTML(room.name)}</a></h3>
         <div class="meta">${formatDate(b.checkIn)} → ${formatDate(b.checkOut)} · ${nights} night${nights > 1 ? "s" : ""} · ${b.guests} guest${b.guests > 1 ? "s" : ""}</div>
-        <div class="meta">${escapeHTML(room.location)} · RM ${room.price * nights + CLEANING_FEE}</div>
+        <div class="meta">${escapeHTML(room.summary)} · RM ${room.price * nights + CLEANING_FEE}</div>
       </div>
       <div class="actions">
         ${canCancel ? `<button class="btn btn-ghost" data-cancel="${b.id}">Cancel</button>` : ""}
@@ -30,7 +30,7 @@ function bookingHTML(b, canCancel) {
 
 function renderBookings(user) {
   const today = toISO(new Date());
-  const mine = Bookings.forUser(user.id).sort((a, b) => a.checkIn.localeCompare(b.checkIn));
+  const mine = [...Bookings.forUser()].sort((a, b) => a.checkIn.localeCompare(b.checkIn));
   const confirmed = mine.filter((b) => b.status === "confirmed");
   const upcoming = confirmed.filter((b) => b.checkOut > today);
   const past = confirmed.filter((b) => b.checkOut <= today);
@@ -59,17 +59,18 @@ ready.then(() => {
   renderProfile(user);
   renderBookings(user);
 
-  document.getElementById("bookings").addEventListener("click", (e) => {
+  document.getElementById("bookings").addEventListener("click", async (e) => {
     const id = e.target.dataset.cancel;
     if (id && confirm("Cancel this booking? The dates will become available to other guests.")) {
-      Bookings.cancel(id, user.id);
+      e.target.disabled = true;
+      await Bookings.cancel(id);
       renderBookings(user);
     }
   });
 
-  document.getElementById("profile-form").addEventListener("submit", (e) => {
+  document.getElementById("profile-form").addEventListener("submit", async (e) => {
     e.preventDefault();
-    Auth.update({
+    await Auth.update({
       name: document.getElementById("p-name").value.trim(),
       phone: document.getElementById("p-phone").value.trim(),
     });

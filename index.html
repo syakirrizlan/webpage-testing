@@ -3,56 +3,53 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>HomeStay – Find your homestay</title>
+  <title>Redzai Guesthouse</title>
+  <meta name="description" content="Redzai Guesthouse – book the whole house or a single room.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap">
   <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/landing.css">
 </head>
-<body>
-  <header class="site-header">
-    <div class="inner">
-      <a class="logo" href="index.html">⌂ HomeStay</a>
-      <nav id="nav-links"></nav>
-    </div>
-  </header>
+<body class="landing">
+  <main class="landing-grid">
+    <section class="brand-side">
+      <div class="brand-mark" aria-hidden="true">⌂</div>
+      <p class="eyebrow">Selamat datang ke</p>
+      <h1 class="business-name">
+        <span class="name-main">Redzai</span>
+        <span class="name-sub">Guesthouse</span>
+      </h1>
+      <div class="ornament" aria-hidden="true"><span></span><i></i><span></span></div>
+      <p class="tagline">A homely stay for family and friends. Book the whole house, or just the room you need.</p>
 
-  <main>
-    <section class="hero">
-      <h1>Find a homestay that feels like home</h1>
-      <p>Check room availability for your dates and book in a few clicks.</p>
-      <form class="search-bar" id="search-form">
-        <div class="field">
-          <label for="q">Where</label>
-          <select id="q">
-            <option value="">Anywhere</option>
-          </select>
-        </div>
-        <div class="field">
-          <label for="check-in">Check-in</label>
-          <input type="date" id="check-in">
-        </div>
-        <div class="field">
-          <label for="check-out">Check-out</label>
-          <input type="date" id="check-out">
-        </div>
-        <div class="field">
-          <label for="guests">Guests</label>
-          <select id="guests"></select>
-        </div>
-        <button class="btn btn-primary" type="submit">Check availability</button>
-      </form>
+      <div class="cta">
+        <a class="btn btn-primary" href="rooms.html">Check availability</a>
+        <a class="btn btn-outline" href="login.html" id="signin-btn">Sign in</a>
+      </div>
+      <p class="new-guest" id="new-guest">New guest? <a href="login.html?tab=register">Create an account</a></p>
     </section>
 
-    <div id="search-error" class="alert alert-error hidden"></div>
-
-    <div class="results-head">
-      <h2 id="results-title">All rooms</h2>
-      <span id="results-count"></span>
-    </div>
-    <div class="room-grid" id="room-grid"></div>
+    <aside class="art-side" aria-hidden="true">
+      <img class="art-photo" src="images/house.jpg" alt="">
+      <svg class="songket" width="100%" height="100%">
+        <defs>
+          <pattern id="songket" width="28" height="28" patternUnits="userSpaceOnUse">
+            <path d="M14 1 L27 14 L14 27 L1 14 Z" fill="none" stroke="currentColor" stroke-width="1.2"/>
+            <path d="M14 8 L20 14 L14 20 L8 14 Z" fill="currentColor"/>
+          </pattern>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#songket)"/>
+      </svg>
+      <div class="art-card">
+        <b>Whole house or by room</b>
+        <span>3 bedrooms · living room · kitchen</span>
+      </div>
+    </aside>
   </main>
 
-  <footer>HomeStay demo · Data is stored in your browser</footer>
-
+  <script src="js/firebase-config.js"></script>
   <script src="js/store.js"></script>
-  <script src="js/index.js"></script>
+  <script src="js/landing.js"></script>
 </body>
 </html>

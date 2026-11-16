@@ -1,98 +1,56 @@
-// Shared data layer: rooms, users, bookings and session, persisted in localStorage.
-// NOTE: this is a front-end demo. Passwords are hashed client-side but there is
-// no server, so it is not real security.
+// Shared data layer: rooms (static), plus members and bookings stored in
+// Firebase Authentication and Cloud Firestore. Access rules: firestore.rules.
 
+const BUSINESS_NAME = "Redzai Guesthouse";
+
+// Prices, capacities, photos and amenities are placeholders: edit them here.
+// Prices are only shown to signed-in members.
+// "includes" marks the whole-house option: booking it books every room listed.
 const ROOMS = [
   {
+    id: "house",
+    name: "Whole House",
+    summary: "Entire house · 3 bedrooms",
+    price: 260,
+    guests: 8,
+    includes: ["r1", "r2", "r3"],
+    image: "images/house.jpg",
+    amenities: ["3 bedrooms", "Living room", "Kitchen", "Wi-Fi", "Air-cond", "Free parking"],
+    description: "Have the whole guesthouse to yourselves: the big ground-floor room and both upstairs rooms, plus the living room and kitchen. Ideal for families and groups.",
+  },
+  {
     id: "r1",
-    name: "Kampung Garden Chalet",
-    location: "Kuala Selangor",
-    price: 180,
+    name: "Room 1",
+    summary: "Big room · Ground floor",
+    price: 120,
     guests: 4,
-    beds: 2,
-    image: "https://images.unsplash.com/photo-1499793983690-e29da59ef1c2?w=800&q=70",
-    amenities: ["Wi-Fi", "Air-cond", "Kitchen", "Free parking"],
-    description: "A wooden chalet surrounded by fruit trees, a short drive from the fireflies of Kampung Kuantan.",
+    image: "images/room1.jpg",
+    amenities: ["Ground floor", "Air-cond", "Wi-Fi", "Attached bathroom"],
+    description: "Our largest room, on the ground floor with no stairs to climb. Comfortable for a small family or anyone who prefers easy access.",
   },
   {
     id: "r2",
-    name: "Seaside Family House",
-    location: "Port Dickson",
-    price: 320,
-    guests: 8,
-    beds: 4,
-    image: "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?w=800&q=70",
-    amenities: ["Wi-Fi", "Air-cond", "BBQ pit", "Beach access"],
-    description: "Spacious double-storey home two minutes' walk from the beach. Ideal for family gatherings.",
+    name: "Room 2",
+    summary: "Small room · Upstairs",
+    price: 80,
+    guests: 2,
+    image: "images/room2.jpg",
+    amenities: ["Upstairs", "Air-cond", "Wi-Fi"],
+    description: "A cosy upstairs room for one or two guests, quiet and away from the living area.",
   },
   {
     id: "r3",
-    name: "Highland Pine Cabin",
-    location: "Cameron Highlands",
-    price: 250,
-    guests: 3,
-    beds: 1,
-    image: "https://images.unsplash.com/photo-1449158743715-0a90ebb6d2d8?w=800&q=70",
-    amenities: ["Wi-Fi", "Fireplace", "Hot shower", "Tea farm view"],
-    description: "Cosy cabin among the pines with views over the tea plantations. Cool weather all year.",
-  },
-  {
-    id: "r4",
-    name: "Heritage Shophouse Loft",
-    location: "Melaka",
-    price: 210,
+    name: "Room 3",
+    summary: "Small room · Upstairs",
+    price: 80,
     guests: 2,
-    beds: 1,
-    image: "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800&q=70",
-    amenities: ["Wi-Fi", "Air-cond", "Walk to Jonker Street"],
-    description: "Restored 1920s shophouse loft in the heart of the UNESCO heritage zone.",
-  },
-  {
-    id: "r5",
-    name: "Paddy Field Villa",
-    location: "Langkawi",
-    price: 400,
-    guests: 6,
-    beds: 3,
-    image: "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800&q=70",
-    amenities: ["Wi-Fi", "Private pool", "Air-cond", "Kitchen"],
-    description: "Private villa with an infinity pool overlooking emerald paddy fields.",
-  },
-  {
-    id: "r6",
-    name: "City Studio Retreat",
-    location: "Kuala Lumpur",
-    price: 150,
-    guests: 2,
-    beds: 1,
-    image: "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800&q=70",
-    amenities: ["Wi-Fi", "Air-cond", "Gym", "Near LRT"],
-    description: "Modern studio with skyline views, five minutes from the LRT station.",
+    image: "images/room3.jpg",
+    amenities: ["Upstairs", "Air-cond", "Wi-Fi"],
+    description: "A cosy upstairs room for one or two guests, next to Room 2. Book both for a small group.",
   },
 ];
 
 const CLEANING_FEE = 30;
-
-const KEYS = { users: "hs_users", bookings: "hs_bookings", session: "hs_session" };
-
-function load(key, fallback) {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-function save(key, value) {
-  localStorage.setItem(key, JSON.stringify(value));
-}
-
-async function hashPassword(password) {
-  const data = new TextEncoder().encode("homestay:" + password);
-  const digest = await crypto.subtle.digest("SHA-256", data);
-  return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("");
-}
 
 // ---------- Dates ----------
 
@@ -118,123 +76,186 @@ function formatDate(iso) {
   });
 }
 
-// ---------- Seed demo data ----------
+// ---------- Firebase ----------
 
-async function seed() {
-  if (load(KEYS.users, null)) return;
-  save(KEYS.users, [
-    {
-      id: "u_demo",
-      name: "Demo Member",
-      email: "demo@homestay.my",
-      phone: "012-345 6789",
-      passwordHash: await hashPassword("demo123"),
-      joined: toISO(new Date()),
-    },
+// Same files as the "firebase" npm package; loaded from Google's CDN so the
+// site needs no build step.
+const FIREBASE_VERSION = "12.19.0";
+const loadSdk = (name) => import(`https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}/firebase-${name}.js`);
+
+let fb = null; // { auth, db, ...SDK functions }
+let profile = null; // users/{uid} document of the signed-in member
+let myBookings = [];
+// One document per booked night, id "<roomId>_<date>". Firestore refuses to
+// create a night that already exists, which is what stops double bookings.
+let bookedNights = new Set();
+
+async function initFirebase() {
+  if (!window.FIREBASE_CONFIG || !FIREBASE_CONFIG.apiKey) {
+    throw new Error("Firebase is not configured yet. Fill in js/firebase-config.js.");
+  }
+  const [appSdk, authSdk, dbSdk] = await Promise.all([loadSdk("app"), loadSdk("auth"), loadSdk("firestore")]);
+  const app = appSdk.initializeApp(FIREBASE_CONFIG);
+  const auth = authSdk.getAuth(app);
+  const db = dbSdk.getFirestore(app);
+  if (FIREBASE_CONFIG.useEmulators) {
+    authSdk.connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
+    dbSdk.connectFirestoreEmulator(db, "127.0.0.1", 8080);
+  }
+  fb = { auth, db, ...authSdk, ...dbSdk };
+  await auth.authStateReady();
+  await Promise.all([loadMember(), loadNights()]);
+}
+
+async function loadMember() {
+  const user = fb.auth.currentUser;
+  if (!user) {
+    profile = null;
+    myBookings = [];
+    return;
+  }
+  const [snap, bookings] = await Promise.all([
+    fb.getDoc(fb.doc(fb.db, "users", user.uid)),
+    fb.getDocs(fb.query(fb.collection(fb.db, "bookings"), fb.where("userId", "==", user.uid))),
   ]);
-  // A few bookings by other guests so the availability calendar is not empty.
-  const today = toISO(new Date());
-  save(KEYS.bookings, [
-    { id: "b1", roomId: "r1", userId: "u_other", checkIn: addDays(today, 3), checkOut: addDays(today, 6), guests: 2, status: "confirmed" },
-    { id: "b2", roomId: "r2", userId: "u_other", checkIn: addDays(today, 1), checkOut: addDays(today, 4), guests: 6, status: "confirmed" },
-    { id: "b3", roomId: "r3", userId: "u_other", checkIn: addDays(today, 10), checkOut: addDays(today, 13), guests: 2, status: "confirmed" },
-    { id: "b4", roomId: "r5", userId: "u_other", checkIn: addDays(today, 0), checkOut: addDays(today, 7), guests: 4, status: "confirmed" },
-    { id: "b5", roomId: "r1", userId: "u_demo", checkIn: addDays(today, 20), checkOut: addDays(today, 22), guests: 2, status: "confirmed" },
-  ]);
+  profile = { id: user.uid, email: user.email, ...(snap.exists() ? snap.data() : { name: user.email, phone: "", joined: toISO(new Date()) }) };
+  myBookings = bookings.docs.map((d) => ({ id: d.id, ...d.data() }));
+}
+
+async function loadNights() {
+  const snap = await fb.getDocs(fb.query(fb.collection(fb.db, "nights"), fb.where("date", ">=", toISO(new Date()))));
+  bookedNights = new Set(snap.docs.map((d) => d.id));
+}
+
+function friendlyError(err) {
+  const messages = {
+    "auth/invalid-credential": "Incorrect email or password.",
+    "auth/wrong-password": "Incorrect email or password.",
+    "auth/user-not-found": "Incorrect email or password.",
+    "auth/invalid-email": "Please enter a valid email address.",
+    "auth/email-already-in-use": "An account with this email already exists.",
+    "auth/weak-password": "Password must be at least 6 characters.",
+    "auth/too-many-requests": "Too many attempts. Please wait a moment and try again.",
+    "auth/network-request-failed": "Network error. Check your connection and try again.",
+  };
+  return new Error(messages[err.code] || err.message);
 }
 
 // ---------- Auth ----------
 
 const Auth = {
-  users() {
-    return load(KEYS.users, []);
-  },
   current() {
-    const id = load(KEYS.session, null);
-    return id ? this.users().find((u) => u.id === id) || null : null;
+    return profile;
   },
   async login(email, password) {
-    const hash = await hashPassword(password);
-    const user = this.users().find((u) => u.email.toLowerCase() === email.trim().toLowerCase());
-    if (!user || user.passwordHash !== hash) throw new Error("Incorrect email or password.");
-    save(KEYS.session, user.id);
-    return user;
+    try {
+      await fb.signInWithEmailAndPassword(fb.auth, email.trim(), password);
+    } catch (err) {
+      throw friendlyError(err);
+    }
+    await loadMember();
+    return profile;
   },
   async register({ name, email, phone, password }) {
-    const users = this.users();
-    if (users.some((u) => u.email.toLowerCase() === email.trim().toLowerCase())) {
-      throw new Error("An account with this email already exists.");
+    let cred;
+    try {
+      cred = await fb.createUserWithEmailAndPassword(fb.auth, email.trim(), password);
+    } catch (err) {
+      throw friendlyError(err);
     }
-    if (password.length < 6) throw new Error("Password must be at least 6 characters.");
-    const user = {
-      id: "u_" + Date.now().toString(36),
+    await fb.setDoc(fb.doc(fb.db, "users", cred.user.uid), {
       name: name.trim(),
-      email: email.trim(),
       phone: phone.trim(),
-      passwordHash: await hashPassword(password),
       joined: toISO(new Date()),
-    };
-    users.push(user);
-    save(KEYS.users, users);
-    save(KEYS.session, user.id);
-    return user;
+    });
+    await loadMember();
+    return profile;
   },
-  update(changes) {
-    const users = this.users();
-    const user = users.find((u) => u.id === load(KEYS.session, null));
-    if (!user) return;
-    Object.assign(user, changes);
-    save(KEYS.users, users);
+  async update(changes) {
+    await fb.updateDoc(fb.doc(fb.db, "users", profile.id), changes);
+    Object.assign(profile, changes);
   },
-  logout() {
-    localStorage.removeItem(KEYS.session);
+  async logout() {
+    await fb.signOut(fb.auth);
+    profile = null;
+    myBookings = [];
   },
   // Redirect to the login page if nobody is signed in.
   require() {
-    const user = this.current();
-    if (!user) {
+    if (!profile) {
       const next = encodeURIComponent(location.pathname.split("/").pop() + location.search);
       location.href = "login.html?next=" + next;
     }
-    return user;
+    return profile;
   },
 };
 
 // ---------- Bookings & availability ----------
 
+// Night documents only exist for real rooms. Booking the whole house writes a
+// night for each of its rooms, so it clashes with any room booking and vice versa.
+function lockedRooms(roomId) {
+  return getRoom(roomId).includes || [roomId];
+}
+
+const MAX_NIGHTS = 30;
+
 const Bookings = {
-  all() {
-    return load(KEYS.bookings, []);
-  },
-  forRoom(roomId) {
-    return this.all().filter((b) => b.roomId === roomId && b.status === "confirmed");
-  },
-  forUser(userId) {
-    return this.all().filter((b) => b.userId === userId);
-  },
-  // A room is free for [checkIn, checkOut) if no confirmed booking overlaps it.
-  isAvailable(roomId, checkIn, checkOut) {
-    return this.forRoom(roomId).every((b) => checkOut <= b.checkIn || checkIn >= b.checkOut);
+  forUser() {
+    return myBookings;
   },
   isNightBooked(roomId, iso) {
-    return this.forRoom(roomId).some((b) => iso >= b.checkIn && iso < b.checkOut);
+    return lockedRooms(roomId).some((r) => bookedNights.has(`${r}_${iso}`));
   },
-  create({ roomId, userId, checkIn, checkOut, guests }) {
+  // A room is free for [checkIn, checkOut) if none of those nights is booked.
+  isAvailable(roomId, checkIn, checkOut) {
+    for (let d = checkIn; d < checkOut; d = addDays(d, 1)) {
+      if (this.isNightBooked(roomId, d)) return false;
+    }
+    return true;
+  },
+  async create({ roomId, checkIn, checkOut, guests }) {
+    if (!profile) throw new Error("Please log in to book.");
     if (!checkIn || !checkOut || checkOut <= checkIn) throw new Error("Check-out must be after check-in.");
     if (checkIn < toISO(new Date())) throw new Error("Check-in cannot be in the past.");
+    if (nightsBetween(checkIn, checkOut) > MAX_NIGHTS) throw new Error(`Stays are limited to ${MAX_NIGHTS} nights.`);
     if (!this.isAvailable(roomId, checkIn, checkOut)) throw new Error("Sorry, those dates are already booked.");
-    const bookings = this.all();
-    const booking = { id: "b_" + Date.now().toString(36), roomId, userId, checkIn, checkOut, guests, status: "confirmed" };
-    bookings.push(booking);
-    save(KEYS.bookings, bookings);
+
+    const ref = fb.doc(fb.collection(fb.db, "bookings"));
+    const booking = { roomId, userId: profile.id, checkIn, checkOut, guests, status: "confirmed" };
+    const batch = fb.writeBatch(fb.db);
+    batch.set(ref, booking);
+    for (let d = checkIn; d < checkOut; d = addDays(d, 1)) {
+      for (const r of lockedRooms(roomId)) {
+        batch.set(fb.doc(fb.db, "nights", `${r}_${d}`), { roomId: r, date: d, bookingId: ref.id });
+      }
+    }
+    try {
+      await batch.commit();
+    } catch (err) {
+      // Someone else booked one of these nights after this page loaded.
+      await loadNights();
+      if (err.code === "permission-denied") throw new Error("Sorry, those dates were just booked by someone else.");
+      throw err;
+    }
+    myBookings.push({ id: ref.id, ...booking });
+    for (let d = checkIn; d < checkOut; d = addDays(d, 1)) {
+      for (const r of lockedRooms(roomId)) bookedNights.add(`${r}_${d}`);
+    }
     return booking;
   },
-  cancel(id, userId) {
-    const bookings = this.all();
-    const booking = bookings.find((b) => b.id === id && b.userId === userId);
-    if (booking) {
-      booking.status = "cancelled";
-      save(KEYS.bookings, bookings);
+  async cancel(id) {
+    const booking = myBookings.find((b) => b.id === id);
+    if (!booking) return;
+    const batch = fb.writeBatch(fb.db);
+    batch.update(fb.doc(fb.db, "bookings", id), { status: "cancelled" });
+    for (let d = booking.checkIn; d < booking.checkOut; d = addDays(d, 1)) {
+      for (const r of lockedRooms(booking.roomId)) batch.delete(fb.doc(fb.db, "nights", `${r}_${d}`));
+    }
+    await batch.commit();
+    booking.status = "cancelled";
+    for (let d = booking.checkIn; d < booking.checkOut; d = addDays(d, 1)) {
+      for (const r of lockedRooms(booking.roomId)) bookedNights.delete(`${r}_${d}`);
     }
   },
 };
@@ -254,19 +275,29 @@ function renderNav() {
   if (!nav) return;
   const user = Auth.current();
   nav.innerHTML = user
-    ? `<a href="index.html">Rooms</a>
+    ? `<a href="rooms.html">Rooms</a>
        <a href="members.html">My account</a>
        <span class="nav-user">Hi, ${escapeHTML(user.name.split(" ")[0])}</span>
        <button class="btn btn-ghost" id="logout-btn">Log out</button>`
-    : `<a href="index.html">Rooms</a>
+    : `<a href="rooms.html">Rooms</a>
        <a class="btn btn-primary" href="login.html">Log in</a>`;
   const logout = document.getElementById("logout-btn");
   if (logout) {
-    logout.addEventListener("click", () => {
-      Auth.logout();
+    logout.addEventListener("click", async () => {
+      await Auth.logout();
       location.href = "index.html";
     });
   }
 }
 
-const ready = seed().then(renderNav);
+function showStartupError(err) {
+  const main = document.querySelector("main");
+  if (!main) return;
+  const box = document.createElement("div");
+  box.className = "alert alert-error";
+  box.textContent = "Sorry, the site could not connect to its database. " + err.message;
+  main.prepend(box);
+}
+
+const ready = initFirebase().then(renderNav);
+ready.catch(showStartupError);
