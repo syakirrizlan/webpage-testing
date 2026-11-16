@@ -56,6 +56,14 @@ The deposit amount, QR image, account name and WhatsApp number are in `PAYMENT` 
 
 To remove an admin, delete their document from `admins`.
 
+## Publishing changes
+
+Every page loads its CSS and JavaScript with a version tag, e.g. `js/store.js?v=20261117`. When you change any CSS or JS file, change the tag in **all** `.html` files to a new value (for example today's date). Browsers then fetch the new files together instead of mixing cached old files with new ones.
+
+```bash
+sed -i -E 's/\?v=[0-9]+/?v=NEWVALUE/g' *.html
+```
+
 ## Running locally
 
 ```bash
