@@ -181,8 +181,10 @@ const Auth = {
     await loadMember();
     return profile;
   },
+  // setDoc with merge also creates the profile for accounts added in the
+  // Firebase console, which have none yet.
   async update(changes) {
-    await fb.updateDoc(fb.doc(fb.db, "users", profile.id), changes);
+    await fb.setDoc(fb.doc(fb.db, "users", profile.id), { joined: profile.joined, ...changes }, { merge: true });
     Object.assign(profile, changes);
   },
   async logout() {
