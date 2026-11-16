@@ -70,6 +70,17 @@ main { max-width: 1120px; margin: 0 auto; padding: 24px 20px 60px; }
 .btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--text); }
 .btn-ghost:hover { background: #f2f2f2; }
 .btn-block { width: 100%; }
+.link-btn {
+  display: block;
+  margin: 12px auto 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 0.9rem;
+  color: var(--brand-dark);
+  text-decoration: underline;
+  cursor: pointer;
+}
 
 label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 4px; }
 input, select {

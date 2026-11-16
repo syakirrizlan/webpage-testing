@@ -156,6 +156,16 @@ const Auth = {
     await loadMember();
     return profile;
   },
+  // Firebase emails a reset link. For privacy it does not say whether the
+  // email has an account, so neither do we.
+  async resetPassword(email) {
+    try {
+      await fb.sendPasswordResetEmail(fb.auth, email.trim());
+    } catch (err) {
+      if (err.code === "auth/user-not-found") return;
+      throw friendlyError(err);
+    }
+  },
   async register({ name, email, phone, password }) {
     let cred;
     try {
