@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Admin – Redzai Guesthouse</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="inner">
+      <a class="logo" href="index.html">⌂ Redzai Guesthouse</a>
+      <nav id="nav-links"></nav>
+    </div>
+  </header>
+
+  <main>
+    <h1 class="admin-title">Bookings</h1>
+    <div id="admin-denied" class="panel hidden">This page is for the guesthouse admin.</div>
+    <div id="admin" class="hidden">
+      <div class="admin-tabs" id="admin-tabs"></div>
+      <div id="admin-msg" class="alert hidden"></div>
+      <div id="admin-list"></div>
+    </div>
+  </main>
+
+  <footer>Redzai Guesthouse</footer>
+
+  <script src="js/firebase-config.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/admin.js"></script>
+</body>
+</html>
