@@ -10,11 +10,11 @@ function summaryHTML(b) {
       <div>
         <h2>${escapeHTML(room.name)}</h2>
         <div class="meta">${formatDate(b.checkIn)} → ${formatDate(b.checkOut)} · ${nights} night${nights > 1 ? "s" : ""} · ${b.guests} guest${b.guests > 1 ? "s" : ""}</div>
-        <div class="summary">
-          <div><span>Total</span><span>RM ${total}</span></div>
-          <div class="deposit-row"><span>Deposit (non-refundable)</span><span>RM ${PAYMENT.deposit}</span></div>
-          <div><span>Balance on arrival</span><span>RM ${total - PAYMENT.deposit}</span></div>
-        </div>
+      </div>
+      <div class="summary">
+        <div><span>Total</span><span>RM ${total}</span></div>
+        <div class="deposit-row"><span>Deposit (non-refundable)</span><span>RM ${PAYMENT.deposit}</span></div>
+        <div><span>Balance on arrival</span><span>RM ${total - PAYMENT.deposit}</span></div>
       </div>
     </div>`;
 }
