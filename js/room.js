@@ -134,7 +134,7 @@ function showMsg(text, ok) {
   msgEl.innerHTML = text;
 }
 
-document.getElementById("book-form").addEventListener("submit", (e) => {
+document.getElementById("book-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   const user = Auth.current();
   if (!user) {
@@ -142,10 +142,10 @@ document.getElementById("book-form").addEventListener("submit", (e) => {
     location.href = "login.html?next=" + encodeURIComponent(next);
     return;
   }
+  bookBtn.disabled = true;
   try {
-    Bookings.create({
+    await Bookings.create({
       roomId: room.id,
-      userId: user.id,
       checkIn: inEl.value,
       checkOut: outEl.value,
       guests: Number(guestsEl.value),
@@ -155,6 +155,7 @@ document.getElementById("book-form").addEventListener("submit", (e) => {
     update();
     showMsg(`Booking confirmed! See it in <a href="members.html">My account</a>.`, true);
   } catch (err) {
+    update();
     showMsg(escapeHTML(err.message), false);
   }
 });

@@ -1,6 +1,5 @@
-// Shared data layer: rooms, users, bookings and session, persisted in localStorage.
-// NOTE: this is a front-end demo. Passwords are hashed client-side but there is
-// no server, so it is not real security.
+// Shared data layer: rooms (static), plus members and bookings stored in
+// Firebase Authentication and Cloud Firestore. Access rules: firestore.rules.
 
 const ROOMS = [
   {
@@ -73,27 +72,6 @@ const ROOMS = [
 
 const CLEANING_FEE = 30;
 
-const KEYS = { users: "hs_users", bookings: "hs_bookings", session: "hs_session" };
-
-function load(key, fallback) {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-function save(key, value) {
-  localStorage.setItem(key, JSON.stringify(value));
-}
-
-async function hashPassword(password) {
-  const data = new TextEncoder().encode("homestay:" + password);
-  const digest = await crypto.subtle.digest("SHA-256", data);
-  return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("");
-}
-
 // ---------- Dates ----------
 
 function toISO(date) {
@@ -118,124 +96,172 @@ function formatDate(iso) {
   });
 }
 
-// ---------- Seed demo data ----------
+// ---------- Firebase ----------
 
-async function seed() {
-  if (load(KEYS.users, null)) return;
-  save(KEYS.users, [
-    {
-      id: "u_demo",
-      name: "Demo Member",
-      email: "demo@homestay.my",
-      phone: "012-345 6789",
-      passwordHash: await hashPassword("demo123"),
-      joined: toISO(new Date()),
-    },
+// Same files as the "firebase" npm package; loaded from Google's CDN so the
+// site needs no build step.
+const FIREBASE_VERSION = "12.19.0";
+const loadSdk = (name) => import(`https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}/firebase-${name}.js`);
+
+let fb = null; // { auth, db, ...SDK functions }
+let profile = null; // users/{uid} document of the signed-in member
+let myBookings = [];
+// One document per booked night, id "<roomId>_<date>". Firestore refuses to
+// create a night that already exists, which is what stops double bookings.
+let bookedNights = new Set();
+
+async function initFirebase() {
+  if (!window.FIREBASE_CONFIG || !FIREBASE_CONFIG.apiKey) {
+    throw new Error("Firebase is not configured yet. Fill in js/firebase-config.js.");
+  }
+  const [appSdk, authSdk, dbSdk] = await Promise.all([loadSdk("app"), loadSdk("auth"), loadSdk("firestore")]);
+  const app = appSdk.initializeApp(FIREBASE_CONFIG);
+  const auth = authSdk.getAuth(app);
+  const db = dbSdk.getFirestore(app);
+  if (FIREBASE_CONFIG.useEmulators) {
+    authSdk.connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
+    dbSdk.connectFirestoreEmulator(db, "127.0.0.1", 8080);
+  }
+  fb = { auth, db, ...authSdk, ...dbSdk };
+  await auth.authStateReady();
+  await Promise.all([loadMember(), loadNights()]);
+}
+
+async function loadMember() {
+  const user = fb.auth.currentUser;
+  if (!user) {
+    profile = null;
+    myBookings = [];
+    return;
+  }
+  const [snap, bookings] = await Promise.all([
+    fb.getDoc(fb.doc(fb.db, "users", user.uid)),
+    fb.getDocs(fb.query(fb.collection(fb.db, "bookings"), fb.where("userId", "==", user.uid))),
   ]);
-  // A few bookings by other guests so the availability calendar is not empty.
-  const today = toISO(new Date());
-  save(KEYS.bookings, [
-    { id: "b1", roomId: "r1", userId: "u_other", checkIn: addDays(today, 3), checkOut: addDays(today, 6), guests: 2, status: "confirmed" },
-    { id: "b2", roomId: "r2", userId: "u_other", checkIn: addDays(today, 1), checkOut: addDays(today, 4), guests: 6, status: "confirmed" },
-    { id: "b3", roomId: "r3", userId: "u_other", checkIn: addDays(today, 10), checkOut: addDays(today, 13), guests: 2, status: "confirmed" },
-    { id: "b4", roomId: "r5", userId: "u_other", checkIn: addDays(today, 0), checkOut: addDays(today, 7), guests: 4, status: "confirmed" },
-    { id: "b5", roomId: "r1", userId: "u_demo", checkIn: addDays(today, 20), checkOut: addDays(today, 22), guests: 2, status: "confirmed" },
-  ]);
+  profile = { id: user.uid, email: user.email, ...(snap.exists() ? snap.data() : { name: user.email, phone: "", joined: toISO(new Date()) }) };
+  myBookings = bookings.docs.map((d) => ({ id: d.id, ...d.data() }));
+}
+
+async function loadNights() {
+  const snap = await fb.getDocs(fb.query(fb.collection(fb.db, "nights"), fb.where("date", ">=", toISO(new Date()))));
+  bookedNights = new Set(snap.docs.map((d) => d.id));
+}
+
+function friendlyError(err) {
+  const messages = {
+    "auth/invalid-credential": "Incorrect email or password.",
+    "auth/wrong-password": "Incorrect email or password.",
+    "auth/user-not-found": "Incorrect email or password.",
+    "auth/invalid-email": "Please enter a valid email address.",
+    "auth/email-already-in-use": "An account with this email already exists.",
+    "auth/weak-password": "Password must be at least 6 characters.",
+    "auth/too-many-requests": "Too many attempts. Please wait a moment and try again.",
+    "auth/network-request-failed": "Network error. Check your connection and try again.",
+  };
+  return new Error(messages[err.code] || err.message);
 }
 
 // ---------- Auth ----------
 
 const Auth = {
-  users() {
-    return load(KEYS.users, []);
-  },
   current() {
-    const id = load(KEYS.session, null);
-    return id ? this.users().find((u) => u.id === id) || null : null;
+    return profile;
   },
   async login(email, password) {
-    const hash = await hashPassword(password);
-    const user = this.users().find((u) => u.email.toLowerCase() === email.trim().toLowerCase());
-    if (!user || user.passwordHash !== hash) throw new Error("Incorrect email or password.");
-    save(KEYS.session, user.id);
-    return user;
+    try {
+      await fb.signInWithEmailAndPassword(fb.auth, email.trim(), password);
+    } catch (err) {
+      throw friendlyError(err);
+    }
+    await loadMember();
+    return profile;
   },
   async register({ name, email, phone, password }) {
-    const users = this.users();
-    if (users.some((u) => u.email.toLowerCase() === email.trim().toLowerCase())) {
-      throw new Error("An account with this email already exists.");
+    let cred;
+    try {
+      cred = await fb.createUserWithEmailAndPassword(fb.auth, email.trim(), password);
+    } catch (err) {
+      throw friendlyError(err);
     }
-    if (password.length < 6) throw new Error("Password must be at least 6 characters.");
-    const user = {
-      id: "u_" + Date.now().toString(36),
+    await fb.setDoc(fb.doc(fb.db, "users", cred.user.uid), {
       name: name.trim(),
-      email: email.trim(),
       phone: phone.trim(),
-      passwordHash: await hashPassword(password),
       joined: toISO(new Date()),
-    };
-    users.push(user);
-    save(KEYS.users, users);
-    save(KEYS.session, user.id);
-    return user;
+    });
+    await loadMember();
+    return profile;
   },
-  update(changes) {
-    const users = this.users();
-    const user = users.find((u) => u.id === load(KEYS.session, null));
-    if (!user) return;
-    Object.assign(user, changes);
-    save(KEYS.users, users);
+  async update(changes) {
+    await fb.updateDoc(fb.doc(fb.db, "users", profile.id), changes);
+    Object.assign(profile, changes);
   },
-  logout() {
-    localStorage.removeItem(KEYS.session);
+  async logout() {
+    await fb.signOut(fb.auth);
+    profile = null;
+    myBookings = [];
   },
   // Redirect to the login page if nobody is signed in.
   require() {
-    const user = this.current();
-    if (!user) {
+    if (!profile) {
       const next = encodeURIComponent(location.pathname.split("/").pop() + location.search);
       location.href = "login.html?next=" + next;
     }
-    return user;
+    return profile;
   },
 };
 
 // ---------- Bookings & availability ----------
 
 const Bookings = {
-  all() {
-    return load(KEYS.bookings, []);
-  },
-  forRoom(roomId) {
-    return this.all().filter((b) => b.roomId === roomId && b.status === "confirmed");
-  },
-  forUser(userId) {
-    return this.all().filter((b) => b.userId === userId);
-  },
-  // A room is free for [checkIn, checkOut) if no confirmed booking overlaps it.
-  isAvailable(roomId, checkIn, checkOut) {
-    return this.forRoom(roomId).every((b) => checkOut <= b.checkIn || checkIn >= b.checkOut);
+  forUser() {
+    return myBookings;
   },
   isNightBooked(roomId, iso) {
-    return this.forRoom(roomId).some((b) => iso >= b.checkIn && iso < b.checkOut);
+    return bookedNights.has(`${roomId}_${iso}`);
   },
-  create({ roomId, userId, checkIn, checkOut, guests }) {
+  // A room is free for [checkIn, checkOut) if none of those nights is booked.
+  isAvailable(roomId, checkIn, checkOut) {
+    for (let d = checkIn; d < checkOut; d = addDays(d, 1)) {
+      if (this.isNightBooked(roomId, d)) return false;
+    }
+    return true;
+  },
+  async create({ roomId, checkIn, checkOut, guests }) {
+    if (!profile) throw new Error("Please log in to book.");
     if (!checkIn || !checkOut || checkOut <= checkIn) throw new Error("Check-out must be after check-in.");
     if (checkIn < toISO(new Date())) throw new Error("Check-in cannot be in the past.");
     if (!this.isAvailable(roomId, checkIn, checkOut)) throw new Error("Sorry, those dates are already booked.");
-    const bookings = this.all();
-    const booking = { id: "b_" + Date.now().toString(36), roomId, userId, checkIn, checkOut, guests, status: "confirmed" };
-    bookings.push(booking);
-    save(KEYS.bookings, bookings);
+
+    const ref = fb.doc(fb.collection(fb.db, "bookings"));
+    const booking = { roomId, userId: profile.id, checkIn, checkOut, guests, status: "confirmed" };
+    const batch = fb.writeBatch(fb.db);
+    batch.set(ref, booking);
+    for (let d = checkIn; d < checkOut; d = addDays(d, 1)) {
+      batch.set(fb.doc(fb.db, "nights", `${roomId}_${d}`), { roomId, date: d, bookingId: ref.id });
+    }
+    try {
+      await batch.commit();
+    } catch (err) {
+      // Someone else booked one of these nights after this page loaded.
+      await loadNights();
+      if (err.code === "permission-denied") throw new Error("Sorry, those dates were just booked by someone else.");
+      throw err;
+    }
+    myBookings.push({ id: ref.id, ...booking });
+    for (let d = checkIn; d < checkOut; d = addDays(d, 1)) bookedNights.add(`${roomId}_${d}`);
     return booking;
   },
-  cancel(id, userId) {
-    const bookings = this.all();
-    const booking = bookings.find((b) => b.id === id && b.userId === userId);
-    if (booking) {
-      booking.status = "cancelled";
-      save(KEYS.bookings, bookings);
+  async cancel(id) {
+    const booking = myBookings.find((b) => b.id === id);
+    if (!booking) return;
+    const batch = fb.writeBatch(fb.db);
+    batch.update(fb.doc(fb.db, "bookings", id), { status: "cancelled" });
+    for (let d = booking.checkIn; d < booking.checkOut; d = addDays(d, 1)) {
+      batch.delete(fb.doc(fb.db, "nights", `${booking.roomId}_${d}`));
     }
+    await batch.commit();
+    booking.status = "cancelled";
+    for (let d = booking.checkIn; d < booking.checkOut; d = addDays(d, 1)) bookedNights.delete(`${booking.roomId}_${d}`);
   },
 };
 
@@ -262,11 +288,21 @@ function renderNav() {
        <a class="btn btn-primary" href="login.html">Log in</a>`;
   const logout = document.getElementById("logout-btn");
   if (logout) {
-    logout.addEventListener("click", () => {
-      Auth.logout();
+    logout.addEventListener("click", async () => {
+      await Auth.logout();
       location.href = "index.html";
     });
   }
 }
 
-const ready = seed().then(renderNav);
+function showStartupError(err) {
+  const main = document.querySelector("main");
+  if (!main) return;
+  const box = document.createElement("div");
+  box.className = "alert alert-error";
+  box.textContent = "Sorry, the site could not connect to its database. " + err.message;
+  main.prepend(box);
+}
+
+const ready = initFirebase().then(renderNav);
+ready.catch(showStartupError);
