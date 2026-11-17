@@ -1,97 +1,6 @@
-// Shared data layer: rooms (static), plus members and bookings stored in
-// Firebase Authentication and Cloud Firestore. Access rules: firestore.rules.
-
-const BUSINESS_NAME = "Redzai Guesthouse";
-
-// Prices, capacities, photos and amenities are placeholders: edit them here.
-// Prices are only shown to signed-in members.
-// "includes" marks the whole-house option: booking it books every room listed.
-const ROOMS = [
-  {
-    id: "house",
-    name: "Whole House",
-    summary: "Entire house · 3 bedrooms",
-    price: 260,
-    guests: 8,
-    includes: ["r1", "r2", "r3"],
-    image: "images/whole-house.jpg",
-    amenities: ["3 bedrooms", "Living room", "Kitchen", "Wi-Fi", "Air-cond", "Free parking"],
-    description: "Have the whole guesthouse to yourselves: the big ground-floor room and both upstairs rooms, plus the living room and kitchen. Ideal for families and groups.",
-  },
-  {
-    id: "r1",
-    name: "Room 1",
-    summary: "Big room · Ground floor",
-    price: 120,
-    guests: 4,
-    image: "images/room1.jpg",
-    amenities: ["Ground floor", "Air-cond", "Wi-Fi", "Attached bathroom"],
-    description: "Our largest room, on the ground floor with no stairs to climb. Comfortable for a small family or anyone who prefers easy access.",
-  },
-  {
-    id: "r2",
-    name: "Room 2",
-    summary: "Small room · Upstairs",
-    price: 80,
-    guests: 2,
-    image: "images/room2.jpg",
-    amenities: ["Upstairs", "Air-cond", "Wi-Fi"],
-    description: "A cosy upstairs room for one or two guests, quiet and away from the living area.",
-  },
-  {
-    id: "r3",
-    name: "Room 3",
-    summary: "Small room · Upstairs",
-    price: 80,
-    guests: 2,
-    image: "images/room3.jpg",
-    amenities: ["Upstairs", "Air-cond", "Wi-Fi"],
-    description: "A cosy upstairs room for one or two guests, next to Room 2. Book both for a small group.",
-  },
-];
-
-const CLEANING_FEE = 30;
-
-// Deposit and payment details. The QR image, account name and WhatsApp number
-// are placeholders until the owner provides them. holdHours must match the
-// 24 hours in firestore.rules.
-const PAYMENT = {
-  deposit: 50,
-  holdHours: 24,
-  accountName: "", // e.g. "REDZAI GUESTHOUSE"
-  qrImage: "", // e.g. "images/duitnow-qr.png"
-  whatsapp: "", // international format without "+", e.g. "60123456789"
-};
-
-// ---------- Dates ----------
-
-function toISO(date) {
-  const d = new Date(date);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-function addDays(iso, n) {
-  const [y, m, d] = iso.split("-").map(Number);
-  return toISO(new Date(y, m - 1, d + n));
-}
-
-function nightsBetween(checkIn, checkOut) {
-  const a = new Date(checkIn + "T00:00:00");
-  const b = new Date(checkOut + "T00:00:00");
-  return Math.round((b - a) / 86400000);
-}
-
-function formatDate(iso) {
-  return new Date(iso + "T00:00:00").toLocaleDateString(undefined, {
-    day: "numeric", month: "short", year: "numeric",
-  });
-}
-
-function formatDateTime(ms) {
-  return new Date(ms).toLocaleString(undefined, {
-    weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit",
-  });
-}
+// Data layer: member accounts (Firebase Authentication) and bookings (Cloud
+// Firestore), plus the shared header. Business rules live in core.js; access
+// rules in firestore.rules.
 
 // ---------- Firebase ----------
 
@@ -106,10 +15,9 @@ let myBookings = [];
 // One document per booked night of a room, id "<roomId>_<date>", mapped to
 // { bookingId, heldAt }. Firestore refuses to create a night that already
 // exists, which is what stops double bookings. heldAt is set while the
-// booking waits for its deposit; after HOLD_HOURS the night is free again.
+// booking waits for its deposit; after the hold runs out the night is free again.
 let nights = new Map();
 
-const HOLD_MS = PAYMENT.holdHours * 3600 * 1000;
 const toMillis = (t) => (t && t.toMillis ? t.toMillis() : t ?? null);
 const fromDoc = (d) => ({ id: d.id, ...d.data(), createdAt: toMillis(d.data().createdAt) });
 
@@ -156,8 +64,11 @@ async function loadNights() {
   nights = new Map(snap.docs.map((d) => [d.id, { bookingId: d.data().bookingId, heldAt: toMillis(d.data().heldAt) }]));
 }
 
+// Turns Firebase errors into messages a guest can act on.
 function friendlyError(err) {
   const messages = {
+    "permission-denied": "You don't have permission to do that. Please refresh the page and try again.",
+    "unavailable": "Can't reach the server. Check your connection and try again.",
     "auth/invalid-credential": "Incorrect email or password.",
     "auth/wrong-password": "Incorrect email or password.",
     "auth/user-not-found": "Incorrect email or password.",
@@ -235,43 +146,9 @@ const Auth = {
 
 // ---------- Bookings & availability ----------
 
-// Night documents only exist for real rooms. Booking the whole house writes a
-// night for each of its rooms, so it clashes with any room booking and vice versa.
-function lockedRooms(roomId) {
-  return getRoom(roomId).includes || [roomId];
-}
-
-function nightIds(booking) {
-  const ids = [];
-  for (let d = booking.checkIn; d < booking.checkOut; d = addDays(d, 1)) {
-    for (const r of lockedRooms(booking.roomId)) ids.push(`${r}_${d}`);
-  }
-  return ids;
-}
-
 // Nights still held by this booking (an expired hold may have been taken by someone else).
 function ownNights(booking) {
   return nightIds(booking).filter((id) => nights.get(id)?.bookingId === booking.id);
-}
-
-function nightTaken(id) {
-  const n = nights.get(id);
-  return !!n && (n.heldAt === null || n.heldAt + HOLD_MS > Date.now());
-}
-
-const MAX_NIGHTS = 30;
-
-const STATUS = {
-  awaiting_deposit: { label: "Awaiting deposit", badge: "badge-warn" },
-  awaiting_approval: { label: "Awaiting approval", badge: "badge-warn" },
-  confirmed: { label: "Confirmed", badge: "badge-ok" },
-  denied: { label: "Declined", badge: "badge-no" },
-  expired: { label: "Expired", badge: "badge-muted" },
-  cancelled: { label: "Cancelled", badge: "badge-muted" },
-};
-
-function bookingTotal(b) {
-  return getRoom(b.roomId).price * nightsBetween(b.checkIn, b.checkOut) + CLEANING_FEE;
 }
 
 const Bookings = {
@@ -281,15 +158,16 @@ const Bookings = {
   get(id) {
     return myBookings.find((b) => b.id === id) || null;
   },
-  holdDeadline(b) {
-    return b.createdAt + HOLD_MS;
-  },
-  // The stored status, except that an unpaid booking past its deadline is "expired".
-  state(b) {
-    return b.status === "awaiting_deposit" && Date.now() >= this.holdDeadline(b) ? "expired" : b.status;
-  },
   isNightBooked(roomId, iso) {
-    return lockedRooms(roomId).some((r) => nightTaken(`${r}_${iso}`));
+    return lockedRooms(roomId).some((r) => nightBlocks(nights.get(`${r}_${iso}`)));
+  },
+  // Whether the booking still holds every night it needs from today onwards.
+  // False when an expired hold was taken over, or the booking never had its
+  // nights; such a booking must not be approved. (Past nights aren't loaded.)
+  holdsDates(b) {
+    const today = toISO(new Date());
+    const needed = nightIds(b).filter((id) => id.split("_")[1] >= today);
+    return needed.every((id) => nights.get(id)?.bookingId === b.id);
   },
   // A room is free for [checkIn, checkOut) if none of those nights is booked or held.
   isAvailable(roomId, checkIn, checkOut) {
@@ -301,9 +179,8 @@ const Bookings = {
   // Holds the dates for PAYMENT.holdHours while the guest pays the deposit.
   async create({ roomId, checkIn, checkOut, guests, depositAgreed }) {
     if (!profile) throw new Error("Please log in to book.");
-    if (!checkIn || !checkOut || checkOut <= checkIn) throw new Error("Check-out must be after check-in.");
-    if (checkIn < toISO(new Date())) throw new Error("Check-in cannot be in the past.");
-    if (nightsBetween(checkIn, checkOut) > MAX_NIGHTS) throw new Error(`Stays are limited to ${MAX_NIGHTS} nights.`);
+    const problem = stayError(checkIn, checkOut);
+    if (problem) throw new Error(problem);
     if (!depositAgreed) throw new Error(`Please tick the box to accept the non-refundable RM${PAYMENT.deposit} deposit.`);
     if (!this.isAvailable(roomId, checkIn, checkOut)) throw new Error("Sorry, those dates are already booked.");
 
@@ -324,7 +201,7 @@ const Bookings = {
       // Someone else booked one of these nights after this page loaded.
       await loadNights();
       if (err.code === "permission-denied") throw new Error("Sorry, those dates were just booked by someone else.");
-      throw err;
+      throw friendlyError(err);
     }
     const now = Date.now();
     myBookings.push({ ...booking, id: ref.id, createdAt: now });
@@ -334,7 +211,7 @@ const Bookings = {
   // The guest says the deposit is paid; the hold stops expiring until the admin decides.
   async markPaid(id, { method, reference }) {
     const booking = this.get(id);
-    if (!booking || this.state(booking) !== "awaiting_deposit") throw new Error("This booking can no longer be paid.");
+    if (!booking || bookingState(booking) !== "awaiting_deposit") throw new Error("This booking can no longer be paid.");
     const update = { status: "awaiting_approval", paymentMethod: method, paymentRef: reference.trim().slice(0, 60), paidAt: fb.serverTimestamp() };
     const batch = fb.writeBatch(fb.db);
     batch.update(fb.doc(fb.db, "bookings", id), update);
@@ -371,6 +248,7 @@ const Admin = {
     return all.map((b) => ({ ...b, guest: guests.get(b.userId) }));
   },
   async approve(booking, { cashReceived = false } = {}) {
+    if (!Bookings.holdsDates(booking)) throw new Error("This booking no longer holds its dates, so it can't be approved. Decline it instead.");
     const update = { status: "confirmed", decidedAt: fb.serverTimestamp() };
     if (cashReceived) update.paymentMethod = "cash";
     const batch = fb.writeBatch(fb.db);
@@ -399,14 +277,6 @@ function whatsappLink(text) {
   return PAYMENT.whatsapp ? `https://wa.me/${PAYMENT.whatsapp}?text=${encodeURIComponent(text)}` : null;
 }
 
-function getRoom(id) {
-  return ROOMS.find((r) => r.id === id);
-}
-
-function escapeHTML(s) {
-  return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-}
-
 // ---------- Shared header ----------
 
 function renderNav() {
@@ -424,19 +294,30 @@ function renderNav() {
   const logout = document.getElementById("logout-btn");
   if (logout) {
     logout.addEventListener("click", async () => {
-      await Auth.logout();
-      location.href = "index.html";
+      try {
+        await Auth.logout();
+        location.href = "index.html";
+      } catch (err) {
+        showError(friendlyError(err));
+      }
     });
   }
 }
 
-function showStartupError(err) {
+// Page-level error banner, for failures with no better place to show them.
+function showError(err, prefix = "") {
   const main = document.querySelector("main");
   if (!main) return;
-  const box = document.createElement("div");
-  box.className = "alert alert-error";
-  box.textContent = "Sorry, the site could not connect to its database. " + err.message;
-  main.prepend(box);
+  let box = document.getElementById("page-error");
+  if (!box) {
+    box = document.createElement("div");
+    box.id = "page-error";
+    box.className = "alert alert-error";
+    box.setAttribute("role", "alert");
+    main.prepend(box);
+  }
+  box.textContent = prefix + (err && err.message ? err.message : "Something went wrong. Please try again.");
+  box.scrollIntoView({ block: "nearest" });
 }
 
 // On small screens the nav folds into a menu button.
@@ -460,4 +341,10 @@ function setupMenu() {
 
 setupMenu();
 const ready = initFirebase().then(renderNav);
-ready.catch(showStartupError);
+ready.catch((err) => showError(err, "Sorry, the site could not connect to its database. "));
+
+// Safety net: no failed request should ever fail silently.
+window.addEventListener("unhandledrejection", (e) => {
+  console.error(e.reason);
+  showError(friendlyError(e.reason || {}));
+});

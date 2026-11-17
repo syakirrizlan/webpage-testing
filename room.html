@@ -4,7 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Room – Redzai Guesthouse</title>
-  <link rel="stylesheet" href="css/style.css?v=20261119">
+  <meta name="description" content="Availability calendar and booking for Redzai Guesthouse.">
+  <link rel="icon" href="images/favicon.svg" type="image/svg+xml">
+  <meta name="theme-color" content="#154139">
+  <link rel="stylesheet" href="css/style.css?v=20261120">
 </head>
 <body>
   <header class="site-header">
@@ -16,7 +19,7 @@
 
   <main id="room-main">
     <p><a href="rooms.html">← Back to rooms</a></p>
-    <img class="room-hero" id="room-img" alt="">
+    <img class="room-hero" id="room-img" alt="" width="1120" height="380">
 
     <div class="room-layout">
       <div>
@@ -44,7 +47,7 @@
 
       <aside class="booking-box">
         <div class="price-line" id="price-line"></div>
-        <div id="book-msg" class="alert hidden"></div>
+        <div id="book-msg" class="alert hidden" role="alert"></div>
         <form id="book-form">
           <div class="row">
             <div class="field">
@@ -60,7 +63,7 @@
             <label for="b-guests">Guests</label>
             <select id="b-guests"></select>
           </div>
-          <div id="avail-status"></div>
+          <div id="avail-status" role="status"></div>
           <div class="summary hidden" id="summary"></div>
           <div class="deposit-note hidden" id="deposit-note">
             <p>A <b id="deposit-amount"></b> deposit secures your booking. The balance is paid on arrival.</p>
@@ -83,8 +86,9 @@
 
   <footer>Redzai Guesthouse</footer>
 
-  <script src="js/firebase-config.js?v=20261119"></script>
-  <script src="js/store.js?v=20261119"></script>
-  <script src="js/room.js?v=20261119"></script>
+  <script src="js/firebase-config.js?v=20261120"></script>
+  <script src="js/core.js?v=20261120"></script>
+  <script src="js/store.js?v=20261120"></script>
+  <script src="js/room.js?v=20261120"></script>
 </body>
 </html>

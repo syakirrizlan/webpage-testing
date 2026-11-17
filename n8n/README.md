@@ -57,7 +57,7 @@ Times are in Malaysia time. **Status** matches what the website shows, including
 
 ## Notes
 
-- **Prices:** the **Build sheet rows** node has its own copy of the room prices, cleaning fee and deposit. If you change them in `js/store.js`, change them here too.
+- **Prices:** the **Build sheet rows** node has its own copy of the room prices, cleaning fee and deposit. If you change them in `js/core.js`, change them here too.
 - **Firebase free plan:** each run reads one document per booking in the 30-day window, plus one per guest. With 50 active bookings, that's about 7,000 of the 50,000 free reads a day.
 - **Your own columns:** you can add columns to the right of *Last change*, such as notes. The workflow leaves them alone.
 - **Don't rename** the existing headers, especially **Booking ID**. The workflow uses them to find each row.

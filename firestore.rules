@@ -15,8 +15,24 @@ service cloud.firestore {
       return s is string && s.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
     }
 
+    // Midnight UTC on a "YYYY-MM-DD" date. Fails (so the rule denies) when the
+    // date doesn't exist, e.g. 2026-02-31.
+    function dayStart(s) {
+      return timestamp.date(int(s[0:4]), int(s[5:7]), int(s[8:10]));
+    }
+
+    // Limits shared with js/core.js: MAX_NIGHTS and MAX_ADVANCE_DAYS. The two
+    // days of slack cover guests in time zones behind or ahead of UTC.
+    function isBookableStay(checkIn, checkOut) {
+      return isDate(checkIn) && isDate(checkOut)
+        && checkIn < checkOut
+        && dayStart(checkOut) <= dayStart(checkIn) + duration.value(30, 'd')
+        && dayStart(checkIn) >= request.time - duration.value(2, 'd')
+        && dayStart(checkIn) <= request.time + duration.value(367, 'd');
+    }
+
     // How long a booking holds its dates while waiting for the deposit.
-    // Must match PAYMENT.holdHours in js/store.js.
+    // Must match PAYMENT.holdHours in js/core.js.
     function holdEnds(t) {
       return t + duration.value(24, 'h');
     }
@@ -52,16 +68,16 @@ service cloud.firestore {
 
       allow read: if isOwner() || isAdmin();
 
+      // Ids must look like Firestore's auto-ids: they are shown on the admin page.
       allow create: if signedIn()
+        && bookingId.matches('^[A-Za-z0-9]{20}$')
         && request.resource.data.keys().hasOnly(['roomId', 'userId', 'checkIn', 'checkOut', 'guests', 'status', 'depositAgreed', 'createdAt'])
         && request.resource.data.userId == request.auth.uid
         && request.resource.data.status == 'awaiting_deposit'
         && request.resource.data.depositAgreed == true
         && request.resource.data.createdAt == request.time
         && request.resource.data.roomId in ['house', 'r1', 'r2', 'r3']
-        && isDate(request.resource.data.checkIn)
-        && isDate(request.resource.data.checkOut)
-        && request.resource.data.checkIn < request.resource.data.checkOut
+        && isBookableStay(request.resource.data.checkIn, request.resource.data.checkOut)
         && request.resource.data.guests is int
         && request.resource.data.guests >= 1
         && request.resource.data.guests <= 20;

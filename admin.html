@@ -4,7 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Admin – Redzai Guesthouse</title>
-  <link rel="stylesheet" href="css/style.css?v=20261119">
+  <meta name="robots" content="noindex">
+  <link rel="icon" href="images/favicon.svg" type="image/svg+xml">
+  <meta name="theme-color" content="#154139">
+  <link rel="stylesheet" href="css/style.css?v=20261120">
 </head>
 <body>
   <header class="site-header">
@@ -19,15 +22,16 @@
     <div id="admin-denied" class="panel hidden">This page is for the guesthouse admin.</div>
     <div id="admin" class="hidden">
       <div class="admin-tabs" id="admin-tabs"></div>
-      <div id="admin-msg" class="alert hidden"></div>
+      <div id="admin-msg" class="alert hidden" role="alert"></div>
       <div id="admin-list"></div>
     </div>
   </main>
 
   <footer>Redzai Guesthouse</footer>
 
-  <script src="js/firebase-config.js?v=20261119"></script>
-  <script src="js/store.js?v=20261119"></script>
-  <script src="js/admin.js?v=20261119"></script>
+  <script src="js/firebase-config.js?v=20261120"></script>
+  <script src="js/core.js?v=20261120"></script>
+  <script src="js/store.js?v=20261120"></script>
+  <script src="js/admin.js?v=20261120"></script>
 </body>
 </html>
