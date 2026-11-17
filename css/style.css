@@ -141,6 +141,8 @@ input:focus, select:focus { outline: 2px solid var(--brand); border-color: trans
   .room-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1); }
 }
 .room-card img { width: 100%; height: 190px; object-fit: cover; background: #eee; }
+/* The whole-house photo has a lot of sky; keep the front of the house in view when cropped. */
+img[src*="whole-house"] { object-position: 50% 92%; }
 .room-card .body { padding: 14px 16px 16px; flex: 1; display: flex; flex-direction: column; gap: 4px; }
 .room-card h3 { margin: 0; font-size: 1.05rem; }
 .room-card .meta { color: var(--muted); font-size: 0.88rem; }

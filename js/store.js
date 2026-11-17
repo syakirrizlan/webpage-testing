@@ -14,7 +14,7 @@ const ROOMS = [
     price: 260,
     guests: 8,
     includes: ["r1", "r2", "r3"],
-    image: "images/house.jpg",
+    image: "images/whole-house.jpg",
     amenities: ["3 bedrooms", "Living room", "Kitchen", "Wi-Fi", "Air-cond", "Free parking"],
     description: "Have the whole guesthouse to yourselves: the big ground-floor room and both upstairs rooms, plus the living room and kitchen. Ideal for families and groups.",
   },
