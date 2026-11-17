@@ -9,7 +9,7 @@ let all = [];
 let activeTab = "approval";
 
 function inTab(b, tab) {
-  const state = Bookings.state(b);
+  const state = bookingState(b);
   const today = toISO(new Date());
   if (!tab.states.includes(state)) return false;
   if (state === "confirmed" && tab.upcoming) return b.checkOut > today;
@@ -20,8 +20,9 @@ function inTab(b, tab) {
 const METHOD = { qr: "DuitNow QR", cash: "Cash" };
 
 function cardHTML(b) {
-  const room = getRoom(b.roomId);
-  const state = Bookings.state(b);
+  const room = bookingRoom(b);
+  const id = escapeHTML(b.id);
+  const state = bookingState(b);
   const nights = nightsBetween(b.checkIn, b.checkOut);
   const total = bookingTotal(b);
   const g = b.guest || {};
@@ -34,14 +35,17 @@ function cardHTML(b) {
     payment = `Paid by ${METHOD[b.paymentMethod] || escapeHTML(b.paymentMethod)}` +
       (b.paymentRef ? ` · ref <b>${escapeHTML(b.paymentRef)}</b>` : "");
   } else if (state === "awaiting_deposit") {
-    payment = `Deposit not paid yet · hold ends ${formatDateTime(Bookings.holdDeadline(b))}`;
+    payment = `Deposit not paid yet · hold ends ${formatDateTime(holdDeadline(b))}`;
   }
+  // A booking that lost its dates (or never held them) must not be approved.
+  const holds = Bookings.holdsDates(b);
+  const decline = `<button class="btn btn-ghost" data-deny="${id}">Decline</button>`;
   const actions = {
-    awaiting_approval: `<button class="btn btn-primary" data-approve="${b.id}">Approve</button>
-                        <button class="btn btn-ghost" data-deny="${b.id}">Decline</button>`,
-    awaiting_deposit: `<button class="btn btn-primary" data-cash="${b.id}">Cash received – approve</button>
-                       <button class="btn btn-ghost" data-deny="${b.id}">Decline</button>`,
+    awaiting_approval: (holds ? `<button class="btn btn-primary" data-approve="${id}">Approve</button>` : "") + decline,
+    awaiting_deposit: (holds ? `<button class="btn btn-primary" data-cash="${id}">Cash received – approve</button>` : "") + decline,
   }[state] || "";
+  const warning = !holds && actions
+    ? `<p class="note warn">This booking doesn't hold its dates, so it can't be approved. Decline it.</p>` : "";
   const outcome = state === "denied"
     ? `<p class="note">Declined${b.denyReason ? `: “${escapeHTML(b.denyReason)}”` : ""}${b.depositRefund ? ` · <b>refund RM${PAYMENT.deposit} deposit</b>` : ""}</p>`
     : "";
@@ -50,11 +54,12 @@ function cardHTML(b) {
       <div class="admin-card-main">
         <span class="badge ${STATUS[state].badge}">${STATUS[state].label}</span>
         <h3>${escapeHTML(room.name)} · ${formatDate(b.checkIn)} → ${formatDate(b.checkOut)}</h3>
-        <div class="meta">${nights} night${nights > 1 ? "s" : ""} · ${b.guests} guest${b.guests > 1 ? "s" : ""} · total RM ${total} · balance on arrival RM ${total - PAYMENT.deposit}</div>
+        <div class="meta">${plural(nights, "night")} · ${plural(b.guests, "guest")} · total RM ${total} · balance on arrival RM ${total - PAYMENT.deposit}</div>
         <div class="guest"><b>${escapeHTML(g.name || "Unknown guest")}</b> · ${contact}</div>
         ${payment ? `<div class="meta">${payment}</div>` : ""}
         ${outcome}
-        <div class="meta small">Booking #${b.id.slice(0, 6).toUpperCase()}${b.createdAt ? ` · made ${formatDateTime(b.createdAt)}` : ""}</div>
+        ${warning}
+        <div class="meta small">Booking #${escapeHTML(b.id.slice(0, 6).toUpperCase())}${b.createdAt ? ` · made ${formatDateTime(b.createdAt)}` : ""}</div>
       </div>
       <div class="actions">${actions}</div>
     </div>`;
@@ -92,7 +97,11 @@ ready.then(async () => {
     return;
   }
   document.getElementById("admin").classList.remove("hidden");
-  await reload();
+  try {
+    await reload();
+  } catch (err) {
+    showMsg("Couldn't load the bookings. " + friendlyError(err).message, false);
+  }
 
   document.getElementById("admin-tabs").addEventListener("click", (e) => {
     const btn = e.target.closest("[data-tab]");
@@ -108,7 +117,7 @@ ready.then(async () => {
     const id = btn.dataset.approve || btn.dataset.cash || btn.dataset.deny;
     const b = all.find((x) => x.id === id);
     if (!b) return;
-    const name = `${getRoom(b.roomId).name}, ${formatDate(b.checkIn)}`;
+    const name = `${bookingRoom(b).name}, ${formatDate(b.checkIn)}`;
     try {
       if (btn.dataset.deny) {
         const refund = b.status === "awaiting_approval"
@@ -127,7 +136,7 @@ ready.then(async () => {
       }
       await reload();
     } catch (err) {
-      showMsg(err.message, false);
+      showMsg(friendlyError(err).message, false);
       btn.disabled = false;
     }
   });

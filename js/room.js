@@ -26,10 +26,11 @@ document.getElementById("room-desc").textContent = room.description;
 document.getElementById("room-amenities").innerHTML =
   room.amenities.map((a) => `<li>${escapeHTML(a)}</li>`).join("");
 
-for (let n = 1; n <= room.guests; n++) guestsEl.add(new Option(`${n} guest${n > 1 ? "s" : ""}`, n));
+for (let n = 1; n <= room.guests; n++) guestsEl.add(new Option(plural(n, "guest"), n));
 guestsEl.value = Math.min(Number(params.get("guests")) || 1, room.guests);
 inEl.min = today;
 outEl.min = addDays(today, 1);
+inEl.max = addDays(today, MAX_ADVANCE_DAYS);
 inEl.value = params.get("in") || "";
 outEl.value = params.get("out") || "";
 
@@ -48,12 +49,17 @@ function monthHTML(year, month) {
   for (let d = 1; d <= days; d++) {
     const iso = toISO(new Date(year, month, d));
     const cls = ["cal-day"];
-    if (iso < today) cls.push("past");
-    else if (Bookings.isNightBooked(room.id, iso)) cls.push("booked");
+    const past = iso < today;
+    const booked = !past && Bookings.isNightBooked(room.id, iso);
+    const selected = iso === inEl.value || iso === outEl.value;
+    if (past) cls.push("past");
+    if (booked) cls.push("booked");
     if (iso === today) cls.push("today");
-    if (iso === inEl.value || iso === outEl.value) cls.push("selected");
+    if (selected) cls.push("selected");
     else if (inEl.value && outEl.value && iso > inEl.value && iso < outEl.value) cls.push("in-range");
-    cells += `<div class="${cls.join(" ")}" data-date="${iso}">${d}</div>`;
+    const label = `${formatDate(iso)}, ${past ? "past" : booked ? "booked" : "available"}${selected ? ", selected" : ""}`;
+    cells += `<button type="button" class="${cls.join(" ")}" data-date="${iso}" aria-label="${label}"` +
+      `${selected ? ' aria-pressed="true"' : ""}${past ? " disabled" : ""}>${d}</button>`;
   }
   return `<div class="cal-month"><h4>${title}</h4><div class="cal-grid">${cells}</div></div>`;
 }
@@ -114,25 +120,27 @@ function update() {
   msgEl.classList.add("hidden");
   const checkIn = inEl.value;
   const checkOut = outEl.value;
-  const valid = checkIn && checkOut && checkOut > checkIn && checkIn >= today;
+  const problem = stayError(checkIn, checkOut, today);
+  const valid = !problem;
 
   if (!valid) {
-    statusEl.innerHTML = checkIn && !checkOut
-      ? `<span class="badge badge-muted">Now choose a check-out date</span>` : "";
+    statusEl.innerHTML = checkIn && !checkOut ? `<span class="badge badge-muted">Now choose a check-out date</span>`
+      : checkIn && checkOut ? `<span class="badge badge-no">${escapeHTML(problem)}</span>` : "";
     summaryEl.classList.add("hidden");
     bookBtn.disabled = !!(checkIn && checkOut);
   } else {
     const free = Bookings.isAvailable(room.id, checkIn, checkOut);
     const nights = nightsBetween(checkIn, checkOut);
+    const total = stayTotal(room, nights);
     statusEl.innerHTML = free
       ? `<span class="badge badge-ok">✓ Available for your dates</span>`
       : `<span class="badge badge-no">✕ Not available – some nights are booked</span>`;
     summaryEl.innerHTML = `
-      <div><span>RM ${room.price} × ${nights} night${nights > 1 ? "s" : ""}</span><span>RM ${room.price * nights}</span></div>
+      <div><span>RM ${room.price} × ${plural(nights, "night")}</span><span>RM ${room.price * nights}</span></div>
       <div><span>Cleaning fee</span><span>RM ${CLEANING_FEE}</span></div>
-      <div class="total"><span>Total</span><span>RM ${room.price * nights + CLEANING_FEE}</span></div>
+      <div class="total"><span>Total</span><span>RM ${total}</span></div>
       <div class="deposit-row"><span>Deposit now</span><span>RM ${PAYMENT.deposit}</span></div>
-      <div><span>Balance on arrival</span><span>RM ${room.price * nights + CLEANING_FEE - PAYMENT.deposit}</span></div>`;
+      <div><span>Balance on arrival</span><span>RM ${total - PAYMENT.deposit}</span></div>`;
     summaryEl.classList.toggle("hidden", !member);
     bookBtn.disabled = !free;
   }
@@ -144,9 +152,9 @@ function update() {
 function renderBookBar(member, valid) {
   const nights = valid ? nightsBetween(inEl.value, outEl.value) : 0;
   document.getElementById("bar-price").textContent = !member ? room.name
-    : valid ? `RM ${room.price * nights + CLEANING_FEE}` : `RM ${room.price} / night`;
+    : valid ? `RM ${stayTotal(room, nights)}` : `RM ${room.price} / night`;
   document.getElementById("bar-sub").textContent = !member ? "Sign in to see prices"
-    : valid ? `${nights} night${nights > 1 ? "s" : ""} · ${formatDate(inEl.value)} → ${formatDate(outEl.value)}`
+    : valid ? `${plural(nights, "night")} · ${formatDate(inEl.value)} → ${formatDate(outEl.value)}`
     : "Choose your dates";
   document.getElementById("bar-btn").textContent = member ? "Book" : "Sign in";
 }
@@ -201,7 +209,7 @@ document.getElementById("book-form").addEventListener("submit", async (e) => {
       guests: Number(guestsEl.value),
       depositAgreed: document.getElementById("b-agree").checked,
     });
-    location.href = `pay.html?id=${id}`;
+    location.href = `pay.html?id=${encodeURIComponent(id)}`;
   } catch (err) {
     update();
     showMsg(escapeHTML(err.message), false);

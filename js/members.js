@@ -12,7 +12,7 @@ function nextStep(b, state) {
   const balance = bookingTotal(b) - PAYMENT.deposit;
   switch (state) {
     case "awaiting_deposit":
-      return `<p class="note">Pay the RM${PAYMENT.deposit} deposit by <b>${formatDateTime(Bookings.holdDeadline(b))}</b> to keep these dates.</p>`;
+      return `<p class="note">Pay the RM${PAYMENT.deposit} deposit by <b>${formatDateTime(holdDeadline(b))}</b> to keep these dates.</p>`;
     case "awaiting_approval":
       return `<p class="note">Deposit sent. Waiting for the owner to confirm.</p>`;
     case "confirmed":
@@ -28,24 +28,25 @@ function nextStep(b, state) {
 }
 
 function bookingHTML(b) {
-  const room = getRoom(b.roomId);
+  const room = bookingRoom(b);
+  const id = escapeHTML(b.id);
   const nights = nightsBetween(b.checkIn, b.checkOut);
-  const state = Bookings.state(b);
+  const state = bookingState(b);
   const today = toISO(new Date());
   const canCancel = ["awaiting_deposit", "awaiting_approval", "confirmed"].includes(state) && b.checkIn > today;
   return `
     <div class="booking-item">
-      <img src="${room.image}" alt="">
+      <img src="${escapeHTML(room.image)}" alt="" width="110" height="78" loading="lazy">
       <div>
         <span class="badge ${STATUS[state].badge}">${STATUS[state].label}</span>
-        <h3><a href="room.html?id=${room.id}">${escapeHTML(room.name)}</a></h3>
-        <div class="meta">${formatDate(b.checkIn)} → ${formatDate(b.checkOut)} · ${nights} night${nights > 1 ? "s" : ""} · ${b.guests} guest${b.guests > 1 ? "s" : ""}</div>
+        <h3><a href="room.html?id=${encodeURIComponent(room.id)}">${escapeHTML(room.name)}</a></h3>
+        <div class="meta">${formatDate(b.checkIn)} → ${formatDate(b.checkOut)} · ${plural(nights, "night")} · ${plural(b.guests, "guest")}</div>
         <div class="meta">${escapeHTML(room.summary)} · RM ${bookingTotal(b)}</div>
         ${nextStep(b, state)}
       </div>
       <div class="actions">
-        ${state === "awaiting_deposit" ? `<a class="btn btn-primary" href="pay.html?id=${b.id}">Pay deposit</a>` : ""}
-        ${canCancel ? `<button class="btn btn-ghost" data-cancel="${b.id}">Cancel</button>` : ""}
+        ${state === "awaiting_deposit" ? `<a class="btn btn-primary" href="pay.html?id=${encodeURIComponent(b.id)}">Pay deposit</a>` : ""}
+        ${canCancel ? `<button class="btn btn-ghost" data-cancel="${id}">Cancel</button>` : ""}
       </div>
     </div>`;
 }
@@ -53,7 +54,7 @@ function bookingHTML(b) {
 function renderBookings(user) {
   const today = toISO(new Date());
   const mine = [...Bookings.forUser()].sort((a, b) => a.checkIn.localeCompare(b.checkIn));
-  const withState = (states) => mine.filter((b) => states.includes(Bookings.state(b)));
+  const withState = (states) => mine.filter((b) => states.includes(bookingState(b)));
   const action = withState(["awaiting_deposit"]);
   const upcoming = withState(["awaiting_approval", "confirmed"]).filter((b) => b.checkOut > today);
   const past = withState(["confirmed"]).filter((b) => b.checkOut <= today);
@@ -89,22 +90,32 @@ ready.then(() => {
     const warning = paid
       ? `Cancel this booking? Your RM${PAYMENT.deposit} deposit is non-refundable and will be forfeited.`
       : "Cancel this booking? The dates will be released for other guests.";
-    if (confirm(warning)) {
-      e.target.disabled = true;
+    if (!confirm(warning)) return;
+    e.target.disabled = true;
+    try {
       await Bookings.cancel(id);
       renderBookings(user);
+    } catch (err) {
+      e.target.disabled = false;
+      showError(friendlyError(err), "Couldn't cancel the booking. ");
     }
   });
 
   document.getElementById("profile-form").addEventListener("submit", async (e) => {
     e.preventDefault();
-    await Auth.update({
-      name: document.getElementById("p-name").value.trim(),
-      phone: document.getElementById("p-phone").value.trim(),
-    });
-    const updated = Auth.current();
-    renderProfile(updated);
+    const saved = document.getElementById("profile-msg");
+    saved.classList.add("hidden");
+    try {
+      await Auth.update({
+        name: document.getElementById("p-name").value.trim(),
+        phone: document.getElementById("p-phone").value.trim(),
+      });
+    } catch (err) {
+      showError(friendlyError(err), "Couldn't save your profile. ");
+      return;
+    }
+    renderProfile(Auth.current());
     renderNav();
-    document.getElementById("profile-msg").classList.remove("hidden");
+    saved.classList.remove("hidden");
   });
 });

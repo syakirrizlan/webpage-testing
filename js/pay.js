@@ -1,15 +1,15 @@
 const box = document.getElementById("pay");
 
 function summaryHTML(b) {
-  const room = getRoom(b.roomId);
+  const room = bookingRoom(b);
   const nights = nightsBetween(b.checkIn, b.checkOut);
   const total = bookingTotal(b);
   return `
     <div class="pay-summary">
-      <img src="${room.image}" alt="">
+      <img src="${escapeHTML(room.image)}" alt="" width="140" height="105">
       <div>
         <h2>${escapeHTML(room.name)}</h2>
-        <div class="meta">${formatDate(b.checkIn)} → ${formatDate(b.checkOut)} · ${nights} night${nights > 1 ? "s" : ""} · ${b.guests} guest${b.guests > 1 ? "s" : ""}</div>
+        <div class="meta">${formatDate(b.checkIn)} → ${formatDate(b.checkOut)} · ${plural(nights, "night")} · ${plural(b.guests, "guest")}</div>
       </div>
       <div class="summary">
         <div><span>Total</span><span>RM ${total}</span></div>
@@ -27,13 +27,13 @@ function whatsappButton(b, text) {
 }
 
 function paidMessage(b) {
-  const room = getRoom(b.roomId);
+  const room = bookingRoom(b);
   return `Hi, I've paid the RM${PAYMENT.deposit} deposit for booking #${b.id.slice(0, 6).toUpperCase()}: ` +
     `${room.name}, ${formatDate(b.checkIn)} to ${formatDate(b.checkOut)}.`;
 }
 
 function render(b) {
-  const state = Bookings.state(b);
+  const state = bookingState(b);
   if (state === "awaiting_approval") {
     box.innerHTML = `
       <div class="panel">
@@ -47,7 +47,7 @@ function render(b) {
   }
   if (state !== "awaiting_deposit") {
     const text = state === "expired"
-      ? "The 24-hour hold on these dates ended before the deposit was paid, so the dates have been released. Please make a new booking."
+      ? `The ${PAYMENT.holdHours}-hour hold on these dates ended before the deposit was paid, so the dates have been released. Please make a new booking.`
       : `This booking is ${STATUS[state].label.toLowerCase()}.`;
     box.innerHTML = `<div class="panel"><p>${text}</p><p><a href="members.html">Go to My account</a></p></div>`;
     return;
@@ -59,7 +59,7 @@ function render(b) {
   box.innerHTML = `
     <div class="panel">
       <h1>Pay your RM${PAYMENT.deposit} deposit</h1>
-      <p class="hold">Your dates are held until <b>${formatDateTime(Bookings.holdDeadline(b))}</b>. If the deposit isn't paid by then, they are released.</p>
+      <p class="hold">Your dates are held until <b>${formatDateTime(holdDeadline(b))}</b>. If the deposit isn't paid by then, they are released.</p>
       ${summaryHTML(b)}
       <div class="pay-methods">
         <div class="pay-qr">
@@ -100,8 +100,8 @@ function render(b) {
       render(b);
     } catch (err) {
       errorBox.textContent = err.code === "permission-denied"
-        ? "The 24-hour hold has ended, so this booking can no longer be paid. Please make a new booking."
-        : err.message;
+        ? `The ${PAYMENT.holdHours}-hour hold has ended, so this booking can no longer be paid. Please make a new booking.`
+        : friendlyError(err).message;
       errorBox.classList.remove("hidden");
       e.submitter.disabled = false;
     }

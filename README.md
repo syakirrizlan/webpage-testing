@@ -14,7 +14,7 @@ Guests can book:
 | Room 2 | `r2` | Small room, upstairs |
 | Room 3 | `r3` | Small room, upstairs |
 
-Prices, guest limits, photos and descriptions are in the `ROOMS` array in `js/store.js`.
+Prices, guest limits, photos and descriptions are in the `ROOMS` array in `js/core.js`.
 
 | Page | File | What it does |
 | --- | --- | --- |
@@ -46,7 +46,9 @@ Until step 5 is done, the site shows "Firebase is not configured yet".
 3. An admin checks the money arrived and **approves** (*confirmed*) or **declines** (*declined*; a deposit already paid is marked for refund). For cash paid in person, **Cash received – approve** confirms straight away.
 4. The balance is paid on arrival. A member who cancels after paying forfeits the deposit.
 
-The deposit amount, QR image, account name and WhatsApp number are in `PAYMENT` in `js/store.js` (placeholders for now). The 24-hour hold is also written in `firestore.rules`; change both together.
+The deposit amount, QR image, account name and WhatsApp number are in `PAYMENT` in `js/core.js` (placeholders for now).
+
+Limits enforced both on the pages and in `firestore.rules` (change both together): the 24-hour hold, stays of at most 30 nights, and check-in no more than a year ahead.
 
 ### Making someone an admin
 
@@ -78,17 +80,51 @@ Then open http://localhost:8000. `localhost` is an authorized domain by default.
 
 ## How it works
 
-- `js/store.js` loads the Firebase SDK from Google's CDN, so there is still no build step.
+### Code layout
+
+| File | Responsibility |
+| --- | --- |
+| `js/core.js` | Business rules with no browser or Firebase dependencies: rooms and prices, dates, stay validation, pricing, booking state. Unit-tested. |
+| `js/store.js` | Data layer: accounts (Firebase Authentication), bookings (Firestore), admin actions, shared header and error banner. |
+| `js/<page>.js` | One script per page; rendering and events only. |
+| `firestore.rules` | Server-side access rules: the real security boundary. |
+| `tests/` | Unit tests (`tests/unit`) and security-rule tests (`tests/rules`). |
+
+Pages load plain `<script>` files in order (`firebase-config.js`, `core.js`, `store.js`, page script), so there is no build step.
+
+### Data
+
+- `js/store.js` loads the Firebase SDK from Google's CDN.
 - `users/{uid}`: member profile (name, phone, join date). Only that member can read or change it.
 - `admins/{uid}`: one document per admin; managed in the Firebase console only.
 - `bookings/{id}`: room, dates, guests, status and payment details. Only the member who made it and admins can read it. Members can mark it paid or cancel it; only admins can approve or decline.
 - `nights/{roomId}_{date}`: one document per booked night, readable by everyone to show availability. It holds no personal data. Firestore refuses to create a night that already exists (unless its unpaid 24-hour hold has run out), so two members can never book the same night, even at the same moment.
 - Booking the Whole House writes a night document for each of `r1`, `r2` and `r3`, so it can never overlap a room booking, and a room booking blocks the Whole House.
-- Room listings are defined in the `ROOMS` array in `js/store.js`. If you add or rename a room, update the room lists in `firestore.rules` and publish the rules again.
+- Room listings are defined in the `ROOMS` array in `js/core.js`. If you add or rename a room, update the room lists in `firestore.rules` and publish the rules again.
 
 The `firebaseConfig` values in `js/firebase-config.js` are not secret; access is controlled by sign-in and `firestore.rules`.
 
-## Testing with the Firebase emulator
+## Tests
+
+```bash
+npm ci
+```
+
+```bash
+npm test
+```
+
+```bash
+npm run test:rules
+```
+
+- `npm test` runs the unit tests for `js/core.js` (dates, stay validation, pricing, booking state). It needs only Node.
+- `npm run test:rules` starts the Firestore emulator (needs Java) and checks `firestore.rules`: who can read and write what, double bookings, holds, approval, and hostile input.
+- GitHub Actions (`.github/workflows/tests.yml`) runs both on every pull request and on `main`.
+
+After changing `firestore.rules`, publish them in the Firebase console (Firestore → Rules).
+
+## Running the site against the Firebase emulator
 
 `firebase.json` configures the Auth and Firestore emulators:
 

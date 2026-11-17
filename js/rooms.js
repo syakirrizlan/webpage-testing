@@ -8,9 +8,10 @@ const errorBox = document.getElementById("search-error");
 const today = toISO(new Date());
 checkInEl.min = today;
 checkOutEl.min = addDays(today, 1);
+checkInEl.max = addDays(today, MAX_ADVANCE_DAYS);
 
 const maxGuests = Math.max(...ROOMS.map((r) => r.guests));
-for (let n = 1; n <= maxGuests; n++) guestsSel.add(new Option(`${n} guest${n > 1 ? "s" : ""}`, n));
+for (let n = 1; n <= maxGuests; n++) guestsSel.add(new Option(plural(n, "guest"), n));
 
 // Restore a previous search from the URL so the back button keeps results.
 const params = new URLSearchParams(location.search);
@@ -28,17 +29,13 @@ function render() {
   const checkIn = checkInEl.value;
   const checkOut = checkOutEl.value;
   const guests = Number(guestsSel.value);
-  const hasDates = checkIn && checkOut;
+  const hasDates = !!(checkIn || checkOut);
 
-  errorBox.classList.add("hidden");
-  if ((checkIn && !checkOut) || (!checkIn && checkOut)) {
-    errorBox.textContent = "Please choose both check-in and check-out dates.";
-    errorBox.classList.remove("hidden");
-    return;
-  }
-  if (hasDates && checkOut <= checkIn) {
-    errorBox.textContent = "Check-out must be after check-in.";
-    errorBox.classList.remove("hidden");
+  // No dates is fine (browse everything); otherwise both must make a valid stay.
+  const problem = hasDates ? stayError(checkIn, checkOut, today) : null;
+  errorBox.classList.toggle("hidden", !problem);
+  if (problem) {
+    errorBox.textContent = problem;
     return;
   }
 
@@ -61,7 +58,7 @@ function render() {
     ? `${formatDate(checkIn)} – ${formatDate(checkOut)}`
     : "Rooms & whole house";
   document.getElementById("results-count").textContent = hasDates
-    ? `${availableCount} of ${rooms.length} available · ${nights} night${nights > 1 ? "s" : ""}`
+    ? `${availableCount} of ${rooms.length} available · ${plural(nights, "night")}`
     : `${rooms.length} option${rooms.length === 1 ? "" : "s"}`;
 
   const query = hasDates ? `&in=${checkIn}&out=${checkOut}&guests=${guests}` : "";
@@ -71,11 +68,11 @@ function render() {
           : r.available ? `<span class="badge badge-ok">Available</span>`
           : `<span class="badge badge-no">Booked for these dates</span>`;
         const price = !member ? `<span class="price-locked">Sign in to see prices</span>`
-          : hasDates ? `<b>RM ${r.price * nights}</b> total · RM ${r.price}/night`
+          : hasDates ? `<b>RM ${stayTotal(r, nights)}</b> total · RM ${r.price}/night`
           : `<b>RM ${r.price}</b> / night`;
         return `
           <a class="room-card ${r.available === false ? "unavailable" : ""}" href="room.html?id=${r.id}${query}">
-            <img src="${r.image}" alt="${escapeHTML(r.name)}" loading="lazy">
+            <img src="${escapeHTML(r.image)}" alt="${escapeHTML(r.name)}" width="400" height="190" loading="lazy" decoding="async">
             <div class="body">
               ${badge}
               <h3>${escapeHTML(r.name)}</h3>
