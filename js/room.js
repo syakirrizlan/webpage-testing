@@ -58,13 +58,18 @@ function monthHTML(year, month) {
   return `<div class="cal-month"><h4>${title}</h4><div class="cal-grid">${cells}</div></div>`;
 }
 
+// Two months side by side on wide screens, one on phones.
+const wide = matchMedia("(min-width: 641px)");
+
 function renderCalendar() {
   const y = viewMonth.getFullYear();
   const m = viewMonth.getMonth();
-  document.getElementById("cal-months").innerHTML = monthHTML(y, m) + monthHTML(y, m + 1);
+  document.getElementById("cal-months").innerHTML = monthHTML(y, m) + (wide.matches ? monthHTML(y, m + 1) : "");
   const now = new Date();
   document.getElementById("cal-prev").disabled = y === now.getFullYear() && m === now.getMonth();
 }
+
+wide.addEventListener("change", renderCalendar);
 
 document.getElementById("cal-prev").addEventListener("click", () => {
   viewMonth.setMonth(viewMonth.getMonth() - 1);
@@ -132,8 +137,32 @@ function update() {
     bookBtn.disabled = !free;
   }
   document.getElementById("deposit-note").classList.toggle("hidden", !member);
+  renderBookBar(member, valid);
   renderCalendar();
 }
+
+function renderBookBar(member, valid) {
+  const nights = valid ? nightsBetween(inEl.value, outEl.value) : 0;
+  document.getElementById("bar-price").textContent = !member ? room.name
+    : valid ? `RM ${room.price * nights + CLEANING_FEE}` : `RM ${room.price} / night`;
+  document.getElementById("bar-sub").textContent = !member ? "Sign in to see prices"
+    : valid ? `${nights} night${nights > 1 ? "s" : ""} · ${formatDate(inEl.value)} → ${formatDate(outEl.value)}`
+    : "Choose your dates";
+  document.getElementById("bar-btn").textContent = member ? "Book" : "Sign in";
+}
+
+// Hide the bar once the booking box itself is on screen.
+new IntersectionObserver(([entry]) => {
+  document.getElementById("book-bar").classList.toggle("off", entry.isIntersecting);
+}).observe(document.querySelector(".booking-box"));
+
+document.getElementById("bar-btn").addEventListener("click", () => {
+  if (!Auth.current()) {
+    location.href = loginUrl();
+    return;
+  }
+  document.querySelector(".booking-box").scrollIntoView({ behavior: "smooth", block: "start" });
+});
 
 document.getElementById("deposit-amount").textContent = `RM${PAYMENT.deposit}`;
 

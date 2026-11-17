@@ -56,6 +56,10 @@ The deposit amount, QR image, account name and WhatsApp number are in `PAYMENT` 
 
 To remove an admin, delete their document from `admins`.
 
+## Booking log (n8n)
+
+`n8n/booking-log.workflow.json` keeps a Google Sheet with one row per booking, updated every 15 minutes. Setup steps are in [`n8n/README.md`](n8n/README.md).
+
 ## Publishing changes
 
 Every page loads its CSS and JavaScript with a version tag, e.g. `js/store.js?v=20261117`. When you change any CSS or JS file, change the tag in **all** `.html` files to a new value (for example today's date). Browsers then fetch the new files together instead of mixing cached old files with new ones.

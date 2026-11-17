@@ -14,7 +14,7 @@ const ROOMS = [
     price: 260,
     guests: 8,
     includes: ["r1", "r2", "r3"],
-    image: "images/house.jpg",
+    image: "images/whole-house.jpg",
     amenities: ["3 bedrooms", "Living room", "Kitchen", "Wi-Fi", "Air-cond", "Free parking"],
     description: "Have the whole guesthouse to yourselves: the big ground-floor room and both upstairs rooms, plus the living room and kitchen. Ideal for families and groups.",
   },
@@ -439,5 +439,25 @@ function showStartupError(err) {
   main.prepend(box);
 }
 
+// On small screens the nav folds into a menu button.
+function setupMenu() {
+  const header = document.querySelector(".site-header");
+  const nav = document.getElementById("nav-links");
+  if (!header || !nav) return;
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "menu-btn";
+  btn.setAttribute("aria-label", "Menu");
+  btn.setAttribute("aria-expanded", "false");
+  btn.setAttribute("aria-controls", "nav-links");
+  btn.innerHTML = "<span></span><span></span><span></span>";
+  nav.before(btn);
+  btn.addEventListener("click", () => {
+    const open = header.classList.toggle("menu-open");
+    btn.setAttribute("aria-expanded", String(open));
+  });
+}
+
+setupMenu();
 const ready = initFirebase().then(renderNav);
 ready.catch(showStartupError);
