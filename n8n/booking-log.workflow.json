@@ -1,0 +1,205 @@
+{
+  "name": "Redzai Guesthouse – booking log",
+  "nodes": [
+    {
+      "id": "b6f0c1de-0001-4a1e-9a01-000000000001",
+      "name": "Every 15 minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "b6f0c1de-0002-4a1e-9a01-000000000002",
+      "name": "Read recent bookings",
+      "type": "n8n-nodes-base.googleFirebaseCloudFirestore",
+      "typeVersion": 1.1,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "authentication": "serviceAccount",
+        "resource": "document",
+        "operation": "query",
+        "projectId": "redzai-guesthouse",
+        "database": "(default)",
+        "query": "{\"structuredQuery\": {\"from\": [{\"collectionId\": \"bookings\"}], \"where\": {\"fieldFilter\": {\"field\": {\"fieldPath\": \"checkOut\"}, \"op\": \"GREATER_THAN_OR_EQUAL\", \"value\": {\"stringValue\": \"$1\"}}}}}",
+        "queryParameters": "={{ [ $now.minus({ days: 30 }).toFormat('yyyy-MM-dd') ] }}",
+        "simple": true
+      },
+      "notes": "Bookings with check-out in the last 30 days or later. Older bookings no longer change, so their rows stay as they are."
+    },
+    {
+      "id": "b6f0c1de-0003-4a1e-9a01-000000000003",
+      "name": "List guests",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// One item per guest who made one of the bookings, for \"Read guest profiles\".\nconst ids = new Set($input.all().map(({ json }) => json.userId).filter(Boolean));\nreturn [...ids].map((userId) => ({ json: { userId } }));"
+      }
+    },
+    {
+      "id": "b6f0c1de-0004-4a1e-9a01-000000000004",
+      "name": "Read guest profiles",
+      "type": "n8n-nodes-base.googleFirebaseCloudFirestore",
+      "typeVersion": 1.1,
+      "position": [
+        660,
+        0
+      ],
+      "alwaysOutputData": true,
+      "parameters": {
+        "authentication": "serviceAccount",
+        "resource": "document",
+        "operation": "get",
+        "projectId": "redzai-guesthouse",
+        "database": "(default)",
+        "collection": "users",
+        "documentId": "={{ $json.userId }}",
+        "simple": true
+      }
+    },
+    {
+      "id": "b6f0c1de-0005-4a1e-9a01-000000000005",
+      "name": "Build sheet rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// Turns Firestore bookings (from \"Read recent bookings\") and guest profiles\n// (this node's input) into one Google Sheet row per booking.\n// Prices and fees must match PAYMENT, CLEANING_FEE and ROOMS in js/store.js.\nconst ROOMS = {\n  house: { name: 'Whole House', price: 260 },\n  r1: { name: 'Room 1', price: 120 },\n  r2: { name: 'Room 2', price: 80 },\n  r3: { name: 'Room 3', price: 80 },\n};\nconst CLEANING_FEE = 30;\nconst DEPOSIT = 50;\nconst HOLD_HOURS = 24;\nconst TIME_ZONE = 'Asia/Kuala_Lumpur';\n\nconst STATUS = {\n  awaiting_deposit: 'Awaiting deposit',\n  awaiting_approval: 'Awaiting approval',\n  confirmed: 'Confirmed',\n  denied: 'Declined',\n  expired: 'Expired',\n  cancelled: 'Cancelled',\n};\nconst METHOD = { qr: 'DuitNow QR', cash: 'Cash' };\n\nconst guests = {};\nfor (const { json } of $input.all()) {\n  if (json._id) guests[json._id] = json;\n}\n\nconst time = (iso) => (iso ? DateTime.fromISO(iso).setZone(TIME_ZONE).toFormat('yyyy-MM-dd HH:mm') : '');\nconst nightsBetween = (a, b) => Math.round(DateTime.fromISO(b).diff(DateTime.fromISO(a), 'days').days);\n\nconst bookings = $('Read recent bookings').all().map(({ json }) => json);\nbookings.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));\n\nreturn bookings.map((b) => {\n  const room = ROOMS[b.roomId] || { name: b.roomId, price: 0 };\n  const nights = nightsBetween(b.checkIn, b.checkOut);\n  const total = room.price * nights + CLEANING_FEE;\n  // The website shows an unpaid booking as expired once its hold runs out.\n  let status = b.status;\n  if (status === 'awaiting_deposit' && b.createdAt &&\n      DateTime.fromISO(b.createdAt).plus({ hours: HOLD_HOURS }) < DateTime.now()) {\n    status = 'expired';\n  }\n  const guest = guests[b.userId] || {};\n  return {\n    json: {\n      'Booking ID': b._id,\n      'Booked at': time(b.createdAt),\n      'Room': room.name,\n      'Check-in': b.checkIn,\n      'Check-out': b.checkOut,\n      'Nights': nights,\n      'Guests': Number(b.guests),\n      'Status': STATUS[status] || status,\n      'Total (RM)': total,\n      'Deposit (RM)': DEPOSIT,\n      'Balance (RM)': total - DEPOSIT,\n      'Payment method': METHOD[b.paymentMethod] || b.paymentMethod || '',\n      'Payment ref': b.paymentRef || '',\n      'Paid at': time(b.paidAt),\n      'Guest name': guest.name || '',\n      'Phone': guest.phone || '',\n      'Email': guest.email || '',\n      'Decided at': time(b.decidedAt),\n      'Decline reason': b.denyReason || '',\n      'Refund due': b.depositRefund ? 'Yes' : '',\n      'Cancelled at': time(b.cancelledAt),\n      'Last change': time(b._updateTime),\n    },\n  };\n});"
+      }
+    },
+    {
+      "id": "b6f0c1de-0006-4a1e-9a01-000000000006",
+      "name": "Save to Google Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1100,
+        0
+      ],
+      "parameters": {
+        "authentication": "serviceAccount",
+        "resource": "sheet",
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [
+            "Booking ID"
+          ],
+          "schema": [
+            {
+              "id": "Booking ID",
+              "displayName": "Booking ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      },
+      "notes": "Adds a row for each new booking and updates the row when its status changes, matched on Booking ID."
+    }
+  ],
+  "connections": {
+    "Every 15 minutes": {
+      "main": [
+        [
+          {
+            "node": "Read recent bookings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read recent bookings": {
+      "main": [
+        [
+          {
+            "node": "List guests",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List guests": {
+      "main": [
+        [
+          {
+            "node": "Read guest profiles",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read guest profiles": {
+      "main": [
+        [
+          {
+            "node": "Build sheet rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build sheet rows": {
+      "main": [
+        [
+          {
+            "node": "Save to Google Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Kuala_Lumpur"
+  },
+  "pinData": {},
+  "active": false
+}
